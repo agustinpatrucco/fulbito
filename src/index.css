@@ -1,0 +1,33 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-pitch: #1c7a3e;
+  --color-pitch-dark: #14602f;
+  --color-gold: #d8b34a;
+  --color-silver: #b9c0c8;
+  --color-bronze: #b1743f;
+}
+
+html {
+  color-scheme: dark;
+  /* Stop iOS from zooming when a text input is focused. */
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: #0b0f14;
+  color: #e8edf2;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  /* The pitch is a fixed-height layout; page-level bounce just fights it. */
+  overscroll-behavior-y: none;
+}
+
+/* Bench and roster strips scroll horizontally; the scrollbar is noise on desktop
+   and absent on mobile anyway. */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
