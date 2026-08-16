@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { CANCHAS } from '../../types'
 import type { Cancha, MatchDraft, TeamSize } from '../../types'
 import { Button, ChipGroup, Field, Input } from '../../components/ui'
+import { errorMessage } from '../../lib/errors'
 
 type Props = {
   onCreate: (draft: MatchDraft) => Promise<unknown>
@@ -35,7 +36,7 @@ export function NewFechaForm({ onCreate, onDone }: Props) {
       await onCreate({ scheduledAt, cancha, teamSize })
       onDone()
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'No se pudo crear la fecha')
+      setError(errorMessage(e, 'No se pudo crear la fecha'))
       setBusy(false)
     }
   }

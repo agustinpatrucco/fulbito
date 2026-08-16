@@ -7,6 +7,10 @@
 --
 -- Paste this into the Supabase SQL editor and run it once.
 
+-- match_slots must go first: dropping matches with CASCADE only removes the foreign
+-- key constraint match_slots holds, not the table itself, so recreating match_slots
+-- below would otherwise collide with the one still sitting there.
+drop table if exists public.match_slots cascade;
 drop table if exists public.matches cascade;
 
 create table public.matches (

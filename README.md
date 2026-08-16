@@ -108,10 +108,9 @@ Lo que **nunca** hay que publicar es la `service_role key`.
 
 ## Las cartas
 
-Poné tus fondos en `public/cards/` como `gold.png`, `silver.png` y `bronze.png`
-(3:4, ~600×800). Hasta que existan, la app usa degradados de reemplazo.
+Los fondos viven en `public/cards/` como `gold.png`, `silver.png` y `bronze.png`.
 
-Para alinear el nombre y las posiciones con tu diseño, editá
+Para alinear el nombre y las posiciones con el diseño, editá
 **`src/config/cardLayout.ts`** — está todo en porcentajes y es el único archivo que hay
 que tocar.
 
