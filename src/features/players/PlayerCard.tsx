@@ -47,9 +47,7 @@ export function PlayerCard({
       style={{
         aspectRatio: '3 / 4',
         containerType: 'inline-size',
-        // The PNG is the top layer; if it isn't there yet the gradient below shows
-        // through, so the app looks finished before the artwork exists.
-        backgroundImage: `url('${CARD_BACKGROUNDS[player.tier]}'), ${layout.gradient}`,
+        backgroundImage: `url('${CARD_BACKGROUNDS[player.tier]}')`,
         backgroundSize: 'cover',
         backgroundPosition: 'center',
       }}
