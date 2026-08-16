@@ -3,9 +3,10 @@ import { CANCHAS } from '../../types'
 import type { Cancha, Match, MatchDraft, TeamSize } from '../../types'
 import { Button, ChipGroup, Field, Input } from '../../components/ui'
 import { errorMessage } from '../../lib/errors'
-import { isQuarterHour } from './format'
+import { QUARTER_MINUTES } from './format'
 
 type Mode = 'proxima' | 'anterior'
+type QuarterMinute = (typeof QUARTER_MINUTES)[number]
 
 type Props = {
   /** 'proxima' (default) only allows future kickoffs, for the next fecha to build on the
@@ -16,14 +17,18 @@ type Props = {
   onDone: (match: Match) => void
 }
 
-/** `datetime-local` wants "YYYY-MM-DDTHH:mm" in local time, no timezone suffix. */
-function toDatetimeLocal(date: Date): string {
+/** `input[type=date]` wants "YYYY-MM-DD" in local time. */
+function toDateInput(date: Date): string {
   const pad = (n: number) => String(n).padStart(2, '0')
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
 }
 
+const HOURS = Array.from({ length: 24 }, (_, h) => h)
+
 export function NewFechaForm({ mode = 'proxima', onCreate, onDone }: Props) {
-  const [when, setWhen] = useState('')
+  const [date, setDate] = useState('')
+  const [hour, setHour] = useState('')
+  const [minute, setMinute] = useState<QuarterMinute>(0)
   const [cancha, setCancha] = useState<Cancha>('Quintana')
   const [teamSize, setTeamSize] = useState<TeamSize>(6)
   const [busy, setBusy] = useState(false)
@@ -33,15 +38,13 @@ export function NewFechaForm({ mode = 'proxima', onCreate, onDone }: Props) {
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
-    if (!when) return setError('Elegí fecha y hora')
+    if (!date || !hour) return setError('Elegí fecha y hora')
 
-    // A datetime-local string has no timezone, so `Date` reads it as local time —
-    // exactly the wall-clock time the person picked in the field.
-    const picked = new Date(when)
+    const [year, month, day] = date.split('-').map(Number)
+    // Built from separate fields rather than parsed from a single string, so there is no
+    // ambiguity about local vs. UTC and no way to end up with an off-quarter minute.
+    const picked = new Date(year, month - 1, day, Number(hour), minute)
 
-    if (!isQuarterHour(picked)) {
-      return setError('Los minutos deben ser 00, 15, 30 o 45')
-    }
     if (mode === 'anterior' && picked.getTime() > Date.now()) {
       return setError('Un partido anterior no puede tener fecha futura')
     }
@@ -62,17 +65,41 @@ export function NewFechaForm({ mode = 'proxima', onCreate, onDone }: Props) {
 
   return (
     <form onSubmit={submit} className="space-y-4">
-      <Field label="Fecha y hora">
+      <Field label="Fecha">
         <Input
-          type="datetime-local"
-          value={when}
-          // The step only nudges the native spinner to quarter-hours — typed input is
-          // still checked on submit, since browsers don't all enforce it while typing.
-          step={900}
-          min={mode === 'proxima' ? toDatetimeLocal(now) : undefined}
-          max={mode === 'anterior' ? toDatetimeLocal(now) : undefined}
-          onChange={(e) => setWhen(e.target.value)}
+          type="date"
+          value={date}
+          min={mode === 'proxima' ? toDateInput(now) : undefined}
+          max={mode === 'anterior' ? toDateInput(now) : undefined}
+          onChange={(e) => setDate(e.target.value)}
           autoFocus
+        />
+      </Field>
+
+      <Field label="Hora">
+        <select
+          value={hour}
+          onChange={(e) => setHour(e.target.value)}
+          className="w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm
+            outline-none focus:border-emerald-400/60"
+        >
+          <option value="" disabled>
+            — elegir —
+          </option>
+          {HOURS.map((h) => (
+            <option key={h} value={h}>
+              {String(h).padStart(2, '0')} hs
+            </option>
+          ))}
+        </select>
+      </Field>
+
+      <Field label="Minutos">
+        <ChipGroup
+          options={QUARTER_MINUTES}
+          value={[minute]}
+          onChange={([m]) => m !== undefined && setMinute(m)}
+          renderLabel={(m) => String(m).padStart(2, '0')}
         />
       </Field>
 
