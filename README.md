@@ -8,6 +8,11 @@ la cancha.
 - Posiciones **POR / DFC / MC / DC**; un jugador fuera de su puesto queda con **contorno rojo**
 - Se arman **tocando** las cartas, o **pegando la lista** de WhatsApp
 - Fotos de los jugadores subidas desde la misma app
+- **Fechas**: creás la próxima con día, hora y cancha (Quintana / Complejo); al cumplirse
+  el horario, los equipos quedan bloqueados y pasan al historial
+- **Historial**: lineups y resultado de cada fecha jugada, más el récord de victorias de
+  cada jugador (total y por cancha)
+- **Racha**: dos o más victorias seguidas ponen un 🔥 con el número en la carta
 
 ---
 
@@ -42,16 +47,37 @@ Level Security y crea el bucket de fotos.
 - Password: la contraseña compartida que vas a usar en la app
 - Tildá **Auto Confirm User** (si no, Supabase espera una confirmación por mail que nunca va a llegar)
 
-**4. Copiá las claves.** *Project Settings* → *API*. Creá un archivo `.env` en la raíz
-(usá `.env.example` como molde):
+**4. Copiá las claves.** *Project Settings* → **API Keys**. Supabase separó esto en dos
+secciones — usá la de arriba:
+
+- **Publishable and secret API keys** → copiá la **Publishable key** (es el reemplazo
+  de la vieja `anon key`, pensada para ir en el navegador). Va en `VITE_SUPABASE_ANON_KEY`.
+- **Legacy anon, service_role API keys** → si tu proyecto todavía tiene la `anon key`
+  vieja ahí, también sirve; es funcionalmente igual a la Publishable key.
+- **Nunca** uses nada de la sección *Secret* / `service_role` acá — esa clave se salta
+  Row Level Security por completo y no debe salir del panel de Supabase.
+
+La URL del proyecto (`VITE_SUPABASE_URL`) no está en esa misma pestaña: buscala en
+*Project Settings* → **General** o **Data API**, con el formato
+`https://xxxxxxxx.supabase.co`.
+
+Con ambos datos, creá un archivo `.env` en la raíz (usá `.env.example` como molde):
 
 ```
 VITE_SUPABASE_URL=https://xxxxxxxx.supabase.co
-VITE_SUPABASE_ANON_KEY=eyJhbGci...
+VITE_SUPABASE_ANON_KEY=eyJhbGci...   # o sb_publishable_...
 VITE_FULBITO_EMAIL=fulbito@fulbito.local
 ```
 
 Reiniciá `npm run dev`. El cartel de MODO LOCAL desaparece y aparece el botón **Editar**.
+
+### Si ya habías corrido schema.sql antes
+
+Las fechas (`matches`) cambiaron de forma — ahora llevan hora, cancha y resultado en vez
+de solo una fecha del día. Si tu proyecto de Supabase ya tenía la tabla vieja (nunca se
+llegó a usar, así que no hay datos que perder), corré una vez
+[`supabase/migrations/0002_fecha_result.sql`](supabase/migrations/0002_fecha_result.sql)
+en el SQL Editor. Un proyecto nuevo no necesita esto — alcanza con `schema.sql`.
 
 ### Sobre la seguridad
 
@@ -117,6 +143,26 @@ crear en el momento con **Crear**.
 
 ---
 
+## Fechas, historial y racha
+
+**Crear una fecha** desde la pestaña Partido: día, hora, cancha (Quintana o Complejo) y
+tamaño de equipo. Mientras falte para esa hora, la pestaña Partido muestra esa fecha para
+armar los equipos como siempre. En el momento en que se cumple el horario, queda
+**bloqueada automáticamente** — no hay ningún botón que apretar — y la pestaña Partido
+pasa a mostrar un cartel para cargar el resultado y crear la próxima. Solo puede haber
+una fecha "activa" a la vez: la de horario más lejano en el tiempo.
+
+**Cargar el resultado** (goles de cada equipo) se puede hacer apenas la fecha se bloquea,
+desde Partido o desde Historial — y corregirlo después si hace falta.
+
+**Historial** lista todas las fechas jugadas con su alineación y resultado, y arriba de
+todo el récord de cada jugador: victorias totales, victorias por cancha, y racha actual.
+
+**Racha**: dos o más victorias seguidas ponen un 🔥 con el número en la carta del
+jugador, en cualquier pantalla donde aparezca. Un empate o una derrota la corta.
+
+---
+
 ## Comandos
 
 ```bash
@@ -137,14 +183,17 @@ npm run build
 
 ```
 src/
-  types.ts                    posiciones, categorías, Player, Slot
+  types.ts                    posiciones, categorías, Player, Slot, Match
   config/cardLayout.ts        coordenadas de las cartas  ← ajustar acá
   data/formations.ts          formaciones de 6 y de 7
   lib/supabase.ts             cliente (null = modo local)
-  lib/store.ts                CRUD con backend intercambiable
+  lib/store.ts                CRUD de jugadores, backend intercambiable
+  lib/matchStore.ts           CRUD de fechas y alineaciones, backend intercambiable
   lib/auth.ts                 login con la contraseña compartida
   features/players/           carta, formulario, plantel, subida de fotos
-  features/squad/             cancha, banco, ubicación automática
+  features/squad/             cancha, banco, tap-to-assign
+  features/matches/           fecha, bloqueo, resultado, historial, racha (con tests)
   features/import/            parser + matcher de la lista pegada (con tests)
-supabase/schema.sql           tablas, RLS y bucket de fotos
+supabase/schema.sql                          tablas, RLS y bucket de fotos (proyecto nuevo)
+supabase/migrations/0002_fecha_result.sql     al día la tabla matches (proyecto existente)
 ```

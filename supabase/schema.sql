@@ -40,17 +40,25 @@ create policy "players are writable when signed in"
   using (true)
   with check (true);
 
--- saved lineups ---------------------------------------------------------------
+-- fechas (matches) --------------------------------------------------------------
+--
+-- Only one match is "current" at a time: the one with the latest scheduled_at. It's
+-- editable on the pitch until that moment passes, at which point it's locked (read-only
+-- lineups) and shows up in the history, score pending until someone loads it.
 
 create table if not exists public.matches (
   id           uuid primary key default gen_random_uuid(),
-  label        text,
-  played_on    date not null default current_date,
+  scheduled_at timestamptz not null,
+  cancha       text not null check (cancha in ('Quintana','Complejo')),
   team_size    int not null check (team_size in (6, 7)),
   formation_a  text not null,
   formation_b  text not null,
+  score_a      int check (score_a >= 0),
+  score_b      int check (score_b >= 0),
   created_at   timestamptz not null default now()
 );
+
+create index if not exists matches_scheduled_at_idx on public.matches (scheduled_at desc);
 
 create table if not exists public.match_slots (
   match_id   uuid not null references public.matches (id) on delete cascade,

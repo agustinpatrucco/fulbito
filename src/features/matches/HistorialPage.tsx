@@ -1,0 +1,221 @@
+import { useMemo, useState } from 'react'
+import type { Match, Player, Slot, TeamId } from '../../types'
+import { displayName, hasResult, isLocked, winnerOf } from '../../types'
+import { formatFecha } from './format'
+import { ResultForm } from './ResultForm'
+import { MIN_STREAK_TO_SHOW } from './stats'
+import type { useMatches } from './useMatches'
+import type { usePlayers } from '../players/usePlayers'
+
+const TEAM_LABELS: Record<TeamId, string> = { A: 'Equipo 1', B: 'Equipo 2' }
+
+type Props = {
+  roster: ReturnType<typeof usePlayers>
+  matches: ReturnType<typeof useMatches>
+  canEdit: boolean
+}
+
+export function HistorialPage({ roster, matches, canEdit }: Props) {
+  const { byId } = roster
+  const { matches: list, slotsByMatch, stats, loading, setResult } = matches
+  const [expanded, setExpanded] = useState<Set<string>>(new Set())
+
+  const record = useMemo(
+    () =>
+      [...stats.entries()]
+        .map(([playerId, s]) => ({ playerId, player: byId.get(playerId), ...s }))
+        .sort((a, b) => b.wins - a.wins),
+    [stats, byId],
+  )
+
+  if (loading) {
+    return <p className="flex-1 py-16 text-center text-white/40">Cargando…</p>
+  }
+
+  return (
+    <div className="mx-auto w-full max-w-3xl flex-1 overflow-y-auto px-4 py-4">
+      {record.length > 0 && (
+        <section className="mb-6">
+          <h2 className="mb-2 text-sm font-bold uppercase tracking-wide text-white/60">
+            Récord por jugador
+          </h2>
+          <div className="overflow-hidden rounded-xl border border-white/10">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-white/5 text-left text-xs uppercase text-white/40">
+                  <th className="px-3 py-2 font-semibold">Jugador</th>
+                  <th className="px-2 py-2 text-center font-semibold">Victorias</th>
+                  <th className="px-2 py-2 text-center font-semibold">Quintana</th>
+                  <th className="px-2 py-2 text-center font-semibold">Complejo</th>
+                  <th className="px-2 py-2 text-center font-semibold">Racha</th>
+                </tr>
+              </thead>
+              <tbody>
+                {record.map((r) => (
+                  <tr key={r.playerId} className="border-t border-white/5">
+                    <td className="px-3 py-2 font-medium">
+                      {r.player ? displayName(r.player) : 'Jugador eliminado'}
+                    </td>
+                    <td className="px-2 py-2 text-center">{r.wins}</td>
+                    <td className="px-2 py-2 text-center text-white/50">
+                      {r.winsByCancha.Quintana}
+                    </td>
+                    <td className="px-2 py-2 text-center text-white/50">
+                      {r.winsByCancha.Complejo}
+                    </td>
+                    <td className="px-2 py-2 text-center">
+                      {r.streak >= MIN_STREAK_TO_SHOW ? (
+                        <span className="text-orange-300">🔥{r.streak}</span>
+                      ) : (
+                        <span className="text-white/20">—</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+
+      <h2 className="mb-2 text-sm font-bold uppercase tracking-wide text-white/60">Fechas</h2>
+
+      {list.length === 0 ? (
+        <p className="py-10 text-center text-white/40">Todavía no se jugó ninguna fecha.</p>
+      ) : (
+        <ul className="space-y-2">
+          {list.map((match) => (
+            <MatchRow
+              key={match.id}
+              match={match}
+              slots={slotsByMatch.get(match.id) ?? { A: [], B: [] }}
+              byId={byId}
+              canEdit={canEdit}
+              open={expanded.has(match.id)}
+              onToggle={() =>
+                setExpanded((prev) => {
+                  const next = new Set(prev)
+                  if (next.has(match.id)) {
+                    next.delete(match.id)
+                  } else {
+                    next.add(match.id)
+                  }
+                  return next
+                })
+              }
+              onSaveResult={(a, b) => setResult(match.id, a, b)}
+            />
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
+
+function MatchRow({
+  match,
+  slots,
+  byId,
+  canEdit,
+  open,
+  onToggle,
+  onSaveResult,
+}: {
+  match: Match
+  slots: { A: Slot[]; B: Slot[] }
+  byId: Map<string, Player>
+  canEdit: boolean
+  open: boolean
+  onToggle: () => void
+  onSaveResult: (scoreA: number, scoreB: number) => Promise<void>
+}) {
+  const locked = isLocked(match)
+  const winner = winnerOf(match)
+
+  return (
+    <li className="overflow-hidden rounded-xl border border-white/10 bg-white/[0.03]">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="flex w-full items-center gap-3 px-3 py-2.5 text-left hover:bg-white/5"
+      >
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-semibold">{formatFecha(match.scheduledAt)}</p>
+          <p className="text-xs text-white/40">{match.cancha}</p>
+        </div>
+        <ResultBadge match={match} locked={locked} winner={winner} />
+        <span className="text-white/30">{open ? '▲' : '▼'}</span>
+      </button>
+
+      {open && (
+        <div className="border-t border-white/10 px-3 py-3">
+          <div className="grid gap-4 sm:grid-cols-2">
+            {(['A', 'B'] as TeamId[]).map((team) => (
+              <div key={team}>
+                <p className="mb-1 text-xs font-bold uppercase tracking-wide text-white/50">
+                  {TEAM_LABELS[team]}
+                  {winner === team && ' 🏆'}
+                </p>
+                <ul className="space-y-0.5 text-sm">
+                  {slots[team]
+                    .filter((s) => s.playerId)
+                    .map((s) => {
+                      const player = s.playerId ? byId.get(s.playerId) : undefined
+                      return (
+                        <li key={s.index} className="flex gap-2 text-white/70">
+                          <span className="w-8 shrink-0 text-white/30">{s.position}</span>
+                          <span className="truncate">
+                            {player ? displayName(player) : 'Jugador eliminado'}
+                          </span>
+                        </li>
+                      )
+                    })}
+                  {slots[team].every((s) => !s.playerId) && (
+                    <li className="text-white/30">Sin cargar</li>
+                  )}
+                </ul>
+              </div>
+            ))}
+          </div>
+
+          {locked && canEdit && (
+            <div className="mt-4 border-t border-white/10 pt-3">
+              <ResultForm match={match} onSave={onSaveResult} />
+            </div>
+          )}
+        </div>
+      )}
+    </li>
+  )
+}
+
+function ResultBadge({
+  match,
+  locked,
+  winner,
+}: {
+  match: Match
+  locked: boolean
+  winner: ReturnType<typeof winnerOf>
+}) {
+  if (hasResult(match)) {
+    return (
+      <span className="shrink-0 rounded bg-white/10 px-2 py-1 text-sm font-bold tabular-nums">
+        {match.scoreA} – {match.scoreB}
+        {winner === 'draw' && <span className="ml-1 font-normal text-white/40">(empate)</span>}
+      </span>
+    )
+  }
+  if (!locked) {
+    return (
+      <span className="shrink-0 rounded bg-emerald-400/15 px-2 py-1 text-xs font-semibold text-emerald-300">
+        Próxima
+      </span>
+    )
+  }
+  return (
+    <span className="shrink-0 rounded bg-amber-400/15 px-2 py-1 text-xs font-semibold text-amber-200">
+      Sin resultado
+    </span>
+  )
+}

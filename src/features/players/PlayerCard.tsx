@@ -13,6 +13,9 @@ type Props = {
   selected?: boolean
   onClick?: () => void
   className?: string
+  /** Consecutive wins. Only rendered at MIN_STREAK_TO_SHOW or above — the caller already
+      filtered, this component just draws whatever number it's handed. */
+  streak?: number
 }
 
 /**
@@ -26,6 +29,7 @@ export function PlayerCard({
   selected = false,
   onClick,
   className = '',
+  streak = 0,
 }: Props) {
   const layout = CARD_LAYOUTS[player.tier]
   const misplaced = slotPosition ? isOutOfPosition(player, slotPosition) : false
@@ -128,6 +132,17 @@ export function PlayerCard({
 
       {!player.active && (
         <span className="pointer-events-none absolute inset-0 rounded-[8%] bg-black/55" />
+      )}
+
+      {streak >= 2 && (
+        <span
+          title={`${streak} victorias seguidas`}
+          className="pointer-events-none absolute right-[4%] top-[4%] flex items-center gap-[2%]
+            rounded-full bg-black/70 px-[6%] font-bold text-orange-300"
+          style={{ fontSize: '9cqw', lineHeight: '1.8' }}
+        >
+          🔥{streak}
+        </span>
       )}
     </button>
   )
