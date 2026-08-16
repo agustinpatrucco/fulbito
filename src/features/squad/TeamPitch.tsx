@@ -10,6 +10,8 @@ type Props = {
   byId: Map<string, Player>
   selectedId: string | null
   size: TeamSize
+  streaks?: Map<string, number>
+  locked?: boolean
   onSlotTap: (index: number) => void
   onPlayerTap: (playerId: string) => void
   onFormationChange: (formationId: string) => void
@@ -23,6 +25,8 @@ export function TeamPitch({
   byId,
   selectedId,
   size,
+  streaks,
+  locked = false,
   onSlotTap,
   onPlayerTap,
   onFormationChange,
@@ -47,25 +51,34 @@ export function TeamPitch({
         <span className="rounded bg-white/10 px-1.5 py-0.5 text-xs text-white/50">
           {filled}/{slots.length}
         </span>
-        <select
-          value={formation.id}
-          onChange={(e) => onFormationChange(e.target.value)}
-          className="ml-auto rounded-lg border border-white/10 bg-black/40 px-2 py-1 text-xs"
-          aria-label={`Formación de ${label}`}
-        >
-          {formationsForSize(size).map((f) => (
-            <option key={f.id} value={f.id}>
-              {f.label}
-            </option>
-          ))}
-        </select>
-        <button
-          type="button"
-          onClick={onClear}
-          className="rounded-lg border border-white/10 px-2 py-1 text-xs text-white/50 hover:text-white"
-        >
-          Vaciar
-        </button>
+        {!locked && (
+          <>
+            <select
+              value={formation.id}
+              onChange={(e) => onFormationChange(e.target.value)}
+              className="ml-auto rounded-lg border border-white/10 bg-black/40 px-2 py-1 text-xs"
+              aria-label={`Formación de ${label}`}
+            >
+              {formationsForSize(size).map((f) => (
+                <option key={f.id} value={f.id}>
+                  {f.label}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={onClear}
+              className="rounded-lg border border-white/10 px-2 py-1 text-xs text-white/50 hover:text-white"
+            >
+              Vaciar
+            </button>
+          </>
+        )}
+        {locked && (
+          <span className="ml-auto rounded bg-white/10 px-2 py-1 text-xs text-white/50">
+            {formation.label}
+          </span>
+        )}
       </header>
 
       <div
@@ -85,6 +98,8 @@ export function TeamPitch({
                 slot={slot}
                 player={slot.playerId ? byId.get(slot.playerId) : undefined}
                 selectedId={selectedId}
+                streak={slot.playerId ? streaks?.get(slot.playerId) : undefined}
+                locked={locked}
                 onSlotTap={onSlotTap}
                 onPlayerTap={onPlayerTap}
               />
@@ -100,12 +115,16 @@ function SlotView({
   slot,
   player,
   selectedId,
+  streak,
+  locked,
   onSlotTap,
   onPlayerTap,
 }: {
   slot: Slot
   player: Player | undefined
   selectedId: string | null
+  streak?: number
+  locked: boolean
   onSlotTap: (index: number) => void
   onPlayerTap: (playerId: string) => void
 }) {
@@ -113,6 +132,17 @@ function SlotView({
   const width = 'w-[28%] max-w-24'
 
   if (!player) {
+    if (locked) {
+      return (
+        <div
+          className={`${width} flex items-center justify-center rounded-lg border-2 border-dashed
+            border-white/15 bg-black/10 text-xs font-bold text-white/25`}
+          style={{ aspectRatio: '3 / 4' }}
+        >
+          {slot.position}
+        </div>
+      )
+    }
     return (
       <button
         type="button"
@@ -133,9 +163,10 @@ function SlotView({
         player={player}
         slotPosition={slot.position}
         selected={selectedId === player.id}
+        streak={streak}
         // Tapping a placed card picks it up; tapping a slot then drops the pending card
-        // there, swapping with whoever was in it.
-        onClick={() => (selectedId ? onSlotTap(slot.index) : onPlayerTap(player.id))}
+        // there, swapping with whoever was in it. Locked matches are look-only.
+        onClick={locked ? undefined : () => (selectedId ? onSlotTap(slot.index) : onPlayerTap(player.id))}
       />
     </div>
   )

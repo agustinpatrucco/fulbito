@@ -1,18 +1,32 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useAuth } from './lib/auth'
 import { isCloudMode } from './lib/supabase'
 import { PasswordGate } from './components/PasswordGate'
 import { usePlayers } from './features/players/usePlayers'
 import { RosterPage } from './features/players/RosterPage'
 import { PitchPage } from './features/squad/PitchPage'
+import { useMatches } from './features/matches/useMatches'
+import { HistorialPage } from './features/matches/HistorialPage'
 
-type Tab = 'partido' | 'plantel'
+type Tab = 'partido' | 'historial' | 'plantel'
+
+const TAB_LABELS: Record<Tab, string> = {
+  partido: 'Partido',
+  historial: 'Historial',
+  plantel: 'Plantel',
+}
 
 export default function App() {
   const [tab, setTab] = useState<Tab>('partido')
   const [gateOpen, setGateOpen] = useState(false)
   const { canEdit, ready, signIn, signOut } = useAuth()
   const roster = usePlayers()
+  const matches = useMatches(roster.byId)
+
+  const streaks = useMemo(
+    () => new Map([...matches.stats].map(([id, s]) => [id, s.streak])),
+    [matches.stats],
+  )
 
   return (
     <div className="flex h-dvh flex-col">
@@ -22,16 +36,16 @@ export default function App() {
         </span>
 
         <nav className="ml-3 flex overflow-hidden rounded-lg border border-white/10">
-          {(['partido', 'plantel'] as Tab[]).map((t) => (
+          {(['partido', 'historial', 'plantel'] as Tab[]).map((t) => (
             <button
               key={t}
               type="button"
               onClick={() => setTab(t)}
-              className={`px-3 py-1.5 text-sm capitalize transition ${
+              className={`px-3 py-1.5 text-sm transition ${
                 tab === t ? 'bg-white/15 font-semibold' : 'text-white/50 hover:bg-white/8'
               }`}
             >
-              {t}
+              {TAB_LABELS[t]}
             </button>
           ))}
         </nav>
@@ -57,11 +71,15 @@ export default function App() {
         </div>
       </header>
 
-      {tab === 'partido' ? (
-        <PitchPage roster={roster} />
-      ) : (
+      {tab === 'partido' && <PitchPage roster={roster} matches={matches} canEdit={canEdit} />}
+
+      {tab === 'historial' && (
+        <HistorialPage roster={roster} matches={matches} canEdit={canEdit} />
+      )}
+
+      {tab === 'plantel' && (
         <div className="flex-1 overflow-y-auto">
-          <RosterPage roster={roster} canEdit={canEdit} />
+          <RosterPage roster={roster} canEdit={canEdit} streaks={streaks} />
         </div>
       )}
 

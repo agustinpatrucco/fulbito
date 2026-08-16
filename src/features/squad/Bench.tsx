@@ -4,10 +4,11 @@ import { PlayerCard } from '../players/PlayerCard'
 type Props = {
   players: Player[]
   selectedId: string | null
+  streaks?: Map<string, number>
   onPlayerTap: (playerId: string) => void
 }
 
-export function Bench({ players, selectedId, onPlayerTap }: Props) {
+export function Bench({ players, selectedId, streaks, onPlayerTap }: Props) {
   return (
     <div className="border-t border-white/10 bg-black/40 px-3 py-2 backdrop-blur">
       <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-white/40">
@@ -27,6 +28,7 @@ export function Bench({ players, selectedId, onPlayerTap }: Props) {
               <PlayerCard
                 player={player}
                 selected={selectedId === player.id}
+                streak={streaks?.get(player.id)}
                 onClick={() => onPlayerTap(player.id)}
               />
             </div>

@@ -42,7 +42,7 @@ export function Input({ className = '', ...rest }: InputHTMLAttributes<HTMLInput
 }
 
 /** Multi-select rendered as toggle chips — faster than a <select> on a phone. */
-export function ChipGroup<T extends string>({
+export function ChipGroup<T extends string | number>({
   options,
   value,
   onChange,

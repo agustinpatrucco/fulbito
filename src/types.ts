@@ -50,6 +50,43 @@ export type Squad = {
   slots: Slot[]
 }
 
+export const CANCHAS = ['Quintana', 'Complejo'] as const
+export type Cancha = (typeof CANCHAS)[number]
+
+export type Match = {
+  id: string
+  /** ISO datetime. Locking and history ordering both hinge on this one field. */
+  scheduledAt: string
+  cancha: Cancha
+  teamSize: TeamSize
+  formationA: string
+  formationB: string
+  /** Both set together, via the result form. Null means "not played yet". */
+  scoreA: number | null
+  scoreB: number | null
+  createdAt: string
+}
+
+export type MatchDraft = Pick<Match, 'scheduledAt' | 'cancha' | 'teamSize'>
+
+/** A match is locked the instant its kickoff time passes — no manual step needed. */
+export function isLocked(match: Match, now: Date = new Date()): boolean {
+  return new Date(match.scheduledAt).getTime() <= now.getTime()
+}
+
+export function hasResult(match: Match): boolean {
+  return match.scoreA !== null && match.scoreB !== null
+}
+
+export type WinnerTeam = TeamId | 'draw' | null
+
+/** Null until both scores are in. */
+export function winnerOf(match: Match): WinnerTeam {
+  if (!hasResult(match)) return null
+  if (match.scoreA === match.scoreB) return 'draw'
+  return match.scoreA! > match.scoreB! ? 'A' : 'B'
+}
+
 export const POSITION_LABELS: Record<Position, string> = {
   POR: 'Portero',
   DFC: 'Defensa',

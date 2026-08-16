@@ -2,13 +2,16 @@ import { supabase, isCloudMode } from '../../lib/supabase'
 
 /** Photos are stored square and small — cards are tiny, and the free tier is 1 GB. */
 const OUTPUT_SIZE = 600
-const JPEG_QUALITY = 0.85
 
 export type StoredPhoto = { url: string; path: string | null }
 
 /**
  * Centre-crops to a square and downscales before upload. Doing this client-side means a
- * 5 MB phone photo becomes ~80 KB, so the roster stays fast to load over mobile data.
+ * 5 MB phone photo becomes small, so the roster stays fast to load over mobile data.
+ *
+ * Output is PNG, not JPEG: JPEG has no alpha channel, so a transparent-background photo
+ * (a cutout, a sticker) would get its transparent pixels filled in as solid black by the
+ * encoder. PNG keeps the transparency and lets the card's own background show through.
  */
 export async function prepareImage(file: File): Promise<Blob> {
   const bitmap = await createImageBitmap(file)
@@ -25,9 +28,7 @@ export async function prepareImage(file: File): Promise<Blob> {
   ctx.drawImage(bitmap, sx, sy, side, side, 0, 0, OUTPUT_SIZE, OUTPUT_SIZE)
   bitmap.close()
 
-  const blob = await new Promise<Blob | null>((resolve) =>
-    canvas.toBlob(resolve, 'image/jpeg', JPEG_QUALITY),
-  )
+  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'))
   if (!blob) throw new Error('No se pudo procesar la imagen')
   return blob
 }
@@ -49,10 +50,10 @@ export async function uploadPhoto(file: File, playerId: string): Promise<StoredP
 
   // A fresh name per upload dodges the CDN cache that would otherwise keep showing
   // the old photo after a replacement.
-  const path = `${playerId}/${Date.now()}.jpg`
+  const path = `${playerId}/${Date.now()}.png`
   const { error } = await supabase!.storage
     .from('player-photos')
-    .upload(path, blob, { contentType: 'image/jpeg', upsert: true })
+    .upload(path, blob, { contentType: 'image/png', upsert: true })
   if (error) throw error
 
   const { data } = supabase!.storage.from('player-photos').getPublicUrl(path)

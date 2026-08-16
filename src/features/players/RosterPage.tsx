@@ -10,9 +10,10 @@ import type { usePlayers } from './usePlayers'
 type Props = {
   roster: ReturnType<typeof usePlayers>
   canEdit: boolean
+  streaks?: Map<string, number>
 }
 
-export function RosterPage({ roster, canEdit }: Props) {
+export function RosterPage({ roster, canEdit, streaks }: Props) {
   const { players, loading, error, create, update, remove } = roster
   const [query, setQuery] = useState('')
   const [editing, setEditing] = useState<Player | null>(null)
@@ -62,6 +63,7 @@ export function RosterPage({ roster, canEdit }: Props) {
           <div key={player.id}>
             <PlayerCard
               player={player}
+              streak={streaks?.get(player.id)}
               onClick={canEdit ? () => setEditing(player) : undefined}
             />
             <p className="mt-1 truncate text-center text-xs text-white/40">
