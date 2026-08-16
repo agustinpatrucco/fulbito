@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { Match } from '../../types'
 import { Button } from '../../components/ui'
+import { errorMessage } from '../../lib/errors'
 
 type Props = {
   match: Match
@@ -26,7 +27,7 @@ export function ResultForm({ match, onSave, compact = false }: Props) {
     try {
       await onSave(a, b)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'No se pudo guardar el resultado')
+      setError(errorMessage(e, 'No se pudo guardar el resultado'))
     } finally {
       setBusy(false)
     }

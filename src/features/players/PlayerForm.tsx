@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import { POSITIONS, TIERS, TIER_LABELS, POSITION_LABELS } from '../../types'
 import type { Player, PlayerDraft, Position, Tier } from '../../types'
 import { Button, ChipGroup, Field, Input } from '../../components/ui'
+import { errorMessage } from '../../lib/errors'
 import { PlayerCard } from './PlayerCard'
 import { uploadPhoto, deletePhoto } from './photo'
 
@@ -58,7 +59,7 @@ export function PlayerForm({ player, initialName, onSave, onDelete, onDone }: Pr
       setPhotoPath(stored.path)
       await deletePhoto(previousPath)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'No se pudo subir la foto')
+      setError(errorMessage(e, 'No se pudo subir la foto'))
     } finally {
       setBusy(false)
     }
@@ -83,7 +84,7 @@ export function PlayerForm({ player, initialName, onSave, onDelete, onDone }: Pr
       })
       onDone()
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'No se pudo guardar')
+      setError(errorMessage(e, 'No se pudo guardar'))
       setBusy(false)
     }
   }

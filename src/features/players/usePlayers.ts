@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { Player, PlayerDraft } from '../../types'
 import { playerStore } from '../../lib/store'
+import { errorMessage } from '../../lib/errors'
 
 /** Single source of truth for the roster; both screens read from this. */
 export function usePlayers() {
@@ -13,7 +14,7 @@ export function usePlayers() {
       setPlayers(await playerStore.list())
       setError(null)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'No se pudo cargar el plantel')
+      setError(errorMessage(e, 'No se pudo cargar el plantel'))
     } finally {
       setLoading(false)
     }

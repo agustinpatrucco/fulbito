@@ -3,6 +3,7 @@ import type { Match, MatchDraft, Player, Slot, TeamId } from '../../types'
 import { isLocked } from '../../types'
 import { DEFAULT_FORMATION, buildSlots, getFormation } from '../../data/formations'
 import { matchStore } from '../../lib/matchStore'
+import { errorMessage } from '../../lib/errors'
 import { autoPlace, refit } from '../squad/autoPlace'
 import { computePlayerStats } from './stats'
 
@@ -38,7 +39,7 @@ export function useMatches(byId: Map<string, Player>) {
       setSlotsByMatch(loaded)
       setError(null)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'No se pudo cargar la fecha')
+      setError(errorMessage(e, 'No se pudo cargar la fecha'))
     } finally {
       setLoading(false)
     }
@@ -79,7 +80,7 @@ export function useMatches(byId: Map<string, Player>) {
       return map
     })
     matchStore.saveSlots(matchId, team, next).catch((e) => {
-      setError(e instanceof Error ? e.message : 'No se pudo guardar el equipo')
+      setError(errorMessage(e, 'No se pudo guardar el equipo'))
     })
   }, [])
 
@@ -136,7 +137,7 @@ export function useMatches(byId: Map<string, Player>) {
       const formation = getFormation(formationId)
       const { slots: nextSlots } = refit(slots[team], formation, byId)
       matchStore.setFormation(currentMatch.id, team, formationId).catch((e) => {
-        setError(e instanceof Error ? e.message : 'No se pudo cambiar la formación')
+        setError(errorMessage(e, 'No se pudo cambiar la formación'))
       })
       setMatches((prev) =>
         prev.map((m) =>
