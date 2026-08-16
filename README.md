@@ -151,6 +151,16 @@ armar los equipos como siempre. En el momento en que se cumple el horario, queda
 pasa a mostrar un cartel para cargar el resultado y crear la próxima. Solo puede haber
 una fecha "activa" a la vez: la de horario más lejano en el tiempo.
 
+En cualquier fecha, la hora solo admite minutos **00, 15, 30 o 45**.
+
+**Agregar un partido anterior** (solo con sesión iniciada) desde Historial, con
+**+ Agregar partido anterior** — para cargar partidos jugados antes de usar la app. Pide
+lo mismo que crear una fecha, pero al revés: la fecha tiene que ser de hoy o antes. Al
+crearlo se abre directamente **Pegar lista** para cargar las alineaciones, y después
+queda listo para cargarle el resultado ahí mismo en Historial. El mismo botón **Pegar
+lista** también está disponible en cualquier fecha ya bloqueada, por si hace falta
+cargar o corregir una alineación más tarde.
+
 **Cargar el resultado** (goles de cada equipo) se puede hacer apenas la fecha se bloquea,
 desde Partido o desde Historial — y corregirlo después si hace falta.
 

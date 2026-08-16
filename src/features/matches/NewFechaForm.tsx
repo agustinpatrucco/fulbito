@@ -1,12 +1,19 @@
 import { useState } from 'react'
 import { CANCHAS } from '../../types'
-import type { Cancha, MatchDraft, TeamSize } from '../../types'
+import type { Cancha, Match, MatchDraft, TeamSize } from '../../types'
 import { Button, ChipGroup, Field, Input } from '../../components/ui'
 import { errorMessage } from '../../lib/errors'
+import { isQuarterHour } from './format'
+
+type Mode = 'proxima' | 'anterior'
 
 type Props = {
-  onCreate: (draft: MatchDraft) => Promise<unknown>
-  onDone: () => void
+  /** 'proxima' (default) only allows future kickoffs, for the next fecha to build on the
+      pitch. 'anterior' only allows now-or-earlier, for backfilling a partido that already
+      happened straight into Historial. */
+  mode?: Mode
+  onCreate: (draft: MatchDraft) => Promise<Match>
+  onDone: (match: Match) => void
 }
 
 /** `datetime-local` wants "YYYY-MM-DDTHH:mm" in local time, no timezone suffix. */
@@ -15,12 +22,14 @@ function toDatetimeLocal(date: Date): string {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
 
-export function NewFechaForm({ onCreate, onDone }: Props) {
+export function NewFechaForm({ mode = 'proxima', onCreate, onDone }: Props) {
   const [when, setWhen] = useState('')
   const [cancha, setCancha] = useState<Cancha>('Quintana')
   const [teamSize, setTeamSize] = useState<TeamSize>(6)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const now = new Date()
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
@@ -28,13 +37,23 @@ export function NewFechaForm({ onCreate, onDone }: Props) {
 
     // A datetime-local string has no timezone, so `Date` reads it as local time —
     // exactly the wall-clock time the person picked in the field.
-    const scheduledAt = new Date(when).toISOString()
+    const picked = new Date(when)
+
+    if (!isQuarterHour(picked)) {
+      return setError('Los minutos deben ser 00, 15, 30 o 45')
+    }
+    if (mode === 'anterior' && picked.getTime() > Date.now()) {
+      return setError('Un partido anterior no puede tener fecha futura')
+    }
+    if (mode === 'proxima' && picked.getTime() < Date.now()) {
+      return setError('Elegí un horario que todavía no pasó')
+    }
 
     setBusy(true)
     setError(null)
     try {
-      await onCreate({ scheduledAt, cancha, teamSize })
-      onDone()
+      const match = await onCreate({ scheduledAt: picked.toISOString(), cancha, teamSize })
+      onDone(match)
     } catch (e) {
       setError(errorMessage(e, 'No se pudo crear la fecha'))
       setBusy(false)
@@ -47,7 +66,11 @@ export function NewFechaForm({ onCreate, onDone }: Props) {
         <Input
           type="datetime-local"
           value={when}
-          min={toDatetimeLocal(new Date())}
+          // The step only nudges the native spinner to quarter-hours — typed input is
+          // still checked on submit, since browsers don't all enforce it while typing.
+          step={900}
+          min={mode === 'proxima' ? toDatetimeLocal(now) : undefined}
+          max={mode === 'anterior' ? toDatetimeLocal(now) : undefined}
           onChange={(e) => setWhen(e.target.value)}
           autoFocus
         />
@@ -69,7 +92,7 @@ export function NewFechaForm({ onCreate, onDone }: Props) {
       {error && <p className="text-sm text-red-400">{error}</p>}
 
       <Button type="submit" variant="primary" className="w-full" disabled={busy}>
-        {busy ? 'Creando…' : 'Crear fecha'}
+        {busy ? 'Creando…' : mode === 'anterior' ? 'Agregar partido' : 'Crear fecha'}
       </Button>
     </form>
   )
