@@ -1,7 +1,11 @@
 import { useMemo, useState } from 'react'
 import type { Match, Player, Slot, TeamId } from '../../types'
 import { displayName, hasResult, isLocked, winnerOf } from '../../types'
+import { Button } from '../../components/ui'
+import { Modal } from '../../components/Modal'
+import { ImportModal } from '../import/ImportModal'
 import { formatFecha } from './format'
+import { NewFechaForm } from './NewFechaForm'
 import { ResultForm } from './ResultForm'
 import { MIN_STREAK_TO_SHOW } from './stats'
 import type { useMatches } from './useMatches'
@@ -17,8 +21,12 @@ type Props = {
 
 export function HistorialPage({ roster, matches, canEdit }: Props) {
   const { byId } = roster
-  const { matches: list, slotsByMatch, stats, loading, setResult } = matches
+  const { matches: list, slotsByMatch, stats, loading, setResult, fillMatchTeam } = matches
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
+  const [addingPast, setAddingPast] = useState(false)
+  /** The match a "Pegar lista" is currently targeting — set right after creating a past
+      partido, or by tapping the button on any existing row. */
+  const [importingFor, setImportingFor] = useState<Match | null>(null)
 
   const record = useMemo(
     () =>
@@ -34,6 +42,12 @@ export function HistorialPage({ roster, matches, canEdit }: Props) {
 
   return (
     <div className="mx-auto w-full max-w-3xl flex-1 overflow-y-auto px-4 py-4">
+      {canEdit && (
+        <div className="mb-4 flex justify-end">
+          <Button onClick={() => setAddingPast(true)}>+ Agregar partido anterior</Button>
+        </div>
+      )}
+
       {record.length > 0 && (
         <section className="mb-6">
           <h2 className="mb-2 text-sm font-bold uppercase tracking-wide text-white/60">
@@ -104,10 +118,35 @@ export function HistorialPage({ roster, matches, canEdit }: Props) {
                 })
               }
               onSaveResult={(a, b) => setResult(match.id, a, b)}
+              onImportLineup={() => setImportingFor(match)}
             />
           ))}
         </ul>
       )}
+
+      <Modal open={addingPast} title="Agregar partido anterior" onClose={() => setAddingPast(false)}>
+        <NewFechaForm
+          mode="anterior"
+          onCreate={matches.createMatch}
+          onDone={(match) => {
+            setAddingPast(false)
+            setExpanded((prev) => new Set(prev).add(match.id))
+            setImportingFor(match)
+          }}
+        />
+      </Modal>
+
+      <ImportModal
+        open={importingFor !== null}
+        onClose={() => setImportingFor(null)}
+        roster={roster}
+        onApply={(teams) => {
+          if (!importingFor) return
+          fillMatchTeam(importingFor.id, 'A', teams.A, importingFor.formationA)
+          fillMatchTeam(importingFor.id, 'B', teams.B, importingFor.formationB)
+          setImportingFor(null)
+        }}
+      />
     </div>
   )
 }
@@ -120,6 +159,7 @@ function MatchRow({
   open,
   onToggle,
   onSaveResult,
+  onImportLineup,
 }: {
   match: Match
   slots: { A: Slot[]; B: Slot[] }
@@ -128,6 +168,7 @@ function MatchRow({
   open: boolean
   onToggle: () => void
   onSaveResult: (scoreA: number, scoreB: number) => Promise<void>
+  onImportLineup: () => void
 }) {
   const locked = isLocked(match)
   const winner = winnerOf(match)
@@ -179,7 +220,8 @@ function MatchRow({
           </div>
 
           {locked && canEdit && (
-            <div className="mt-4 border-t border-white/10 pt-3">
+            <div className="mt-4 space-y-3 border-t border-white/10 pt-3">
+              <Button onClick={onImportLineup}>Pegar lista</Button>
               <ResultForm match={match} onSave={onSaveResult} />
             </div>
           )}

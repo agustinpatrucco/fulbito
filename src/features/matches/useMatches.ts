@@ -161,6 +161,16 @@ export function useMatches(byId: Map<string, Player>) {
     [currentMatch, locked, persistSlots],
   )
 
+  /** Same as fillTeam but targets an explicit match rather than the current one — used
+      to backfill a lineup for a partido added straight into Historial. */
+  const fillMatchTeam = useCallback(
+    (matchId: string, team: TeamId, players: Player[], formationId: string) => {
+      const { slots: nextSlots } = autoPlace(players, getFormation(formationId))
+      persistSlots(matchId, team, nextSlots)
+    },
+    [persistSlots],
+  )
+
   const clearTeam = useCallback(
     (team: TeamId) => {
       if (!currentMatch || locked) return
@@ -212,6 +222,7 @@ export function useMatches(byId: Map<string, Player>) {
     tapPlayer,
     setFormation,
     fillTeam,
+    fillMatchTeam,
     clearTeam,
     createMatch,
     setResult,
