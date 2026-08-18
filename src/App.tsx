@@ -139,6 +139,7 @@ function GroupApp({ group }: { group: Group }) {
         players={roster.players}
         onSelectPlayer={playerSession.selectPlayer}
         onCreatePlayer={roster.create}
+        onSetPassword={roster.setPassword}
       />
     </div>
   )

@@ -52,9 +52,18 @@ export function usePlayers(groupId: string) {
     [groupId],
   )
 
+  const setPassword = useCallback(
+    async (id: string, passwordHash: string, passwordSalt: string) => {
+      const player = await playerStore.setPassword(groupId, id, passwordHash, passwordSalt)
+      setPlayers((prev) => prev.map((p) => (p.id === id ? player : p)).sort(byName))
+      return player
+    },
+    [groupId],
+  )
+
   const byId = useMemo(() => new Map(players.map((p) => [p.id, p])), [players])
 
-  return { players, byId, loading, error, reload, create, update, remove }
+  return { players, byId, loading, error, reload, create, update, remove, setPassword }
 }
 
 const byName = (a: Player, b: Player) => a.name.localeCompare(b.name, 'es')

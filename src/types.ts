@@ -23,11 +23,20 @@ export type Player = {
   /** The first player created in a group becomes its admin. Never settable through the
       general edit form — only decided once, at creation. */
   isAdmin: boolean
+  /** Null until the first time anyone picks this player — at that point they're asked
+      to set a password, which then gates every future login as them. Blocks logging in
+      as someone else, not a real security boundary (this data is as open as everything
+      else in the app). */
+  passwordHash: string | null
+  passwordSalt: string | null
 }
 
-/** What the forms hand to the store — no id, no timestamp, and no isAdmin: that flag
-    is decided once at creation, never editable afterwards. */
-export type PlayerDraft = Omit<Player, 'id' | 'createdAt' | 'isAdmin'>
+/** What the forms hand to the store — no id, no timestamp, and none of the login-only
+    fields (isAdmin, password) — those are set outside the general edit form. */
+export type PlayerDraft = Omit<
+  Player,
+  'id' | 'createdAt' | 'isAdmin' | 'passwordHash' | 'passwordSalt'
+>
 
 /** One separate roster, unlocked by its own 6-character code. */
 export type Group = {

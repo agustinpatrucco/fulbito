@@ -79,8 +79,10 @@ Corré, en orden, los archivos de `supabase/migrations/` que todavía no hayas c
    comentario cerca del final del archivo: hay un `update` que marca como admin al
    jugador cuyo nombre matchee `%patrucco%` — confirmá que le pega a un solo jugador
    (con el `select` que está comentado justo arriba) antes de correr el `update`.
+4. [`0005_player_passwords.sql`](supabase/migrations/0005_player_passwords.sql) — agrega
+   las columnas de contraseña por jugador.
 
-Un proyecto nuevo no necesita ninguna de las tres — alcanza con `schema.sql`.
+Un proyecto nuevo no necesita ninguna de las cuatro — alcanza con `schema.sql`.
 
 ### Sobre la seguridad
 
@@ -182,15 +184,20 @@ revisitando su URL (guardala o mandátela a vos mismo).
 Dentro de un grupo, si no elegiste todavía quién sos, el cartel para hacerlo aparece
 solo. Dos caminos:
 
-- **Elegir tu jugador**: tocás tu propia carta en la lista, sin contraseña. Desde ahí
-  podés editar tu carta (pestaña **Mi perfil**), crear fechas, armar los equipos
-  (tocando o pegando la lista) y cargar resultados.
+- **Elegir tu jugador**: tocás tu propia carta en la lista. Desde ahí podés editar tu
+  carta (pestaña **Mi perfil**), crear fechas, armar los equipos (tocando o pegando la
+  lista) y cargar resultados.
 - **+ Crear jugador**: si sos nuevo en el grupo, creá tu carta ahí mismo. El primer
   jugador creado en un grupo recién creado queda marcado automáticamente como su
   **admin** — solo un admin puede crear/eliminar otros jugadores, editar la carta de
   cualquiera (no solo la propia), y agregar partidos anteriores al historial.
 
-La sesión queda guardada en el dispositivo, separada por grupo — elegir tu jugador en
+La primera vez que se elige un jugador (desde cualquier dispositivo) la app pide crear
+una contraseña para esa carta; de ahí en más, entrar como ese jugador la vuelve a pedir.
+No es una medida de seguridad real — como el resto de los datos, la contraseña queda
+guardada de forma tan abierta como cualquier otra columna — es solo para que nadie
+entre como otro sin querer o sin permiso. La sesión queda guardada en el dispositivo,
+separada por grupo — elegir tu jugador en
 uno no afecta a los demás grupos a los que te hayas unido.
 
 ---

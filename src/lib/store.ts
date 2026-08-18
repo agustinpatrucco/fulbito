@@ -13,6 +13,9 @@ export type PlayerStore = {
   create(groupId: string, draft: PlayerDraft, isAdmin: boolean): Promise<Player>
   update(groupId: string, id: string, patch: Partial<PlayerDraft>): Promise<Player>
   remove(groupId: string, id: string): Promise<void>
+  /** Sets a player's login password — either the first time anyone picks them, or
+      right after "Crear jugador". */
+  setPassword(groupId: string, id: string, passwordHash: string, passwordSalt: string): Promise<Player>
 }
 
 // --- row mapping ------------------------------------------------------------
@@ -29,6 +32,8 @@ type PlayerRow = {
   active: boolean
   created_at: string
   is_admin: boolean
+  password_hash: string | null
+  password_salt: string | null
 }
 
 function fromRow(row: PlayerRow): Player {
@@ -44,6 +49,8 @@ function fromRow(row: PlayerRow): Player {
     active: row.active,
     createdAt: row.created_at,
     isAdmin: row.is_admin,
+    passwordHash: row.password_hash,
+    passwordSalt: row.password_salt,
   }
 }
 
@@ -98,6 +105,17 @@ const cloudStore: PlayerStore = {
     const { error } = await supabase!.from('players').delete().eq('id', id)
     if (error) throw error
   },
+
+  async setPassword(_groupId, id, passwordHash, passwordSalt) {
+    const { data, error } = await supabase!
+      .from('players')
+      .update({ password_hash: passwordHash, password_salt: passwordSalt })
+      .eq('id', id)
+      .select()
+      .single()
+    if (error) throw error
+    return fromRow(data as PlayerRow)
+  },
 }
 
 // --- local ------------------------------------------------------------------
@@ -129,6 +147,8 @@ const localStore: PlayerStore = {
       id: crypto.randomUUID(),
       createdAt: new Date().toISOString(),
       isAdmin,
+      passwordHash: null,
+      passwordSalt: null,
     }
     writeLocal(groupId, [...readLocal(groupId), player])
     return player
@@ -145,6 +165,15 @@ const localStore: PlayerStore = {
 
   async remove(groupId, id) {
     writeLocal(groupId, readLocal(groupId).filter((p) => p.id !== id))
+  },
+
+  async setPassword(groupId, id, passwordHash, passwordSalt) {
+    const players = readLocal(groupId)
+    const index = players.findIndex((p) => p.id === id)
+    if (index === -1) throw new Error(`No existe el jugador ${id}`)
+    players[index] = { ...players[index], passwordHash, passwordSalt }
+    writeLocal(groupId, players)
+    return players[index]
   },
 }
 
