@@ -48,6 +48,8 @@ export function PlayerForm({ player, initialName, onSave, onDelete, onDone }: Pr
     active,
     createdAt: player?.createdAt ?? new Date().toISOString(),
     isAdmin: player?.isAdmin ?? false,
+    passwordHash: player?.passwordHash ?? null,
+    passwordSalt: player?.passwordSalt ?? null,
   }
 
   async function handlePhoto(file: File) {

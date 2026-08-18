@@ -71,21 +71,26 @@ grant execute on function public.create_group() to anon, authenticated;
 -- players ---------------------------------------------------------------------
 
 create table if not exists public.players (
-  id          uuid primary key default gen_random_uuid(),
-  group_id    uuid not null references public.groups (id),
-  is_admin    boolean not null default false,
-  name        text not null check (length(trim(name)) > 0),
-  nickname    text,
-  aliases     text[] not null default '{}',
-  positions   text[] not null check (
-                array_length(positions, 1) >= 1
-                and positions <@ array['POR','DFC','MC','DC']::text[]
-              ),
-  tier        text not null check (tier in ('gold','silver','bronze')),
-  photo_url   text,
-  photo_path  text,
-  active      boolean not null default true,
-  created_at  timestamptz not null default now()
+  id             uuid primary key default gen_random_uuid(),
+  group_id       uuid not null references public.groups (id),
+  is_admin       boolean not null default false,
+  name           text not null check (length(trim(name)) > 0),
+  nickname       text,
+  aliases        text[] not null default '{}',
+  positions      text[] not null check (
+                   array_length(positions, 1) >= 1
+                   and positions <@ array['POR','DFC','MC','DC']::text[]
+                 ),
+  tier           text not null check (tier in ('gold','silver','bronze')),
+  photo_url      text,
+  photo_path     text,
+  active         boolean not null default true,
+  created_at     timestamptz not null default now(),
+  -- Null until the first time anyone picks this player, at which point the app asks
+  -- them to set one. Not a real security boundary (see the top of this file) — just
+  -- enough friction to stop someone from picking a friend's card instead of their own.
+  password_hash  text,
+  password_salt  text
 );
 
 create index if not exists players_name_idx on public.players (name);
