@@ -4,20 +4,23 @@ import { supabase, isCloudMode } from './supabase'
 /**
  * Same split as `playerStore`: Supabase in cloud mode so a fecha created on the phone
  * shows up on the laptop, localStorage in local mode so the app still works before
- * Supabase exists.
+ * Supabase exists. Every method takes the active group's id — in cloud mode only
+ * `list`/`create` actually need it (match ids are already globally unique), but local
+ * mode keys its storage per group too, so it's threaded through everywhere for one
+ * consistent interface.
  */
 export type MatchStore = {
-  list(): Promise<Match[]>
-  create(draft: MatchDraft, formationA: string, formationB: string): Promise<Match>
+  list(groupId: string): Promise<Match[]>
+  create(groupId: string, draft: MatchDraft, formationA: string, formationB: string): Promise<Match>
   /** Bulk-replaces one team's slots — simpler and safer than per-cell updates when a
       formation change or a swap touches more than one row at once. */
-  saveSlots(matchId: string, team: TeamId, slots: Slot[]): Promise<void>
-  setFormation(matchId: string, team: TeamId, formationId: string): Promise<void>
-  loadSlots(matchId: string): Promise<{ A: Slot[]; B: Slot[] }>
+  saveSlots(groupId: string, matchId: string, team: TeamId, slots: Slot[]): Promise<void>
+  setFormation(groupId: string, matchId: string, team: TeamId, formationId: string): Promise<void>
+  loadSlots(groupId: string, matchId: string): Promise<{ A: Slot[]; B: Slot[] }>
   /** One query for every match's lineup at once — what Historial and the win/streak
       stats need, versus the single `loadSlots` the pitch uses for just the current one. */
-  loadAllSlots(matchIds: string[]): Promise<Map<string, { A: Slot[]; B: Slot[] }>>
-  setResult(matchId: string, scoreA: number, scoreB: number): Promise<Match>
+  loadAllSlots(groupId: string, matchIds: string[]): Promise<Map<string, { A: Slot[]; B: Slot[] }>>
+  setResult(groupId: string, matchId: string, scoreA: number, scoreB: number): Promise<Match>
 }
 
 // --- row mapping --------------------------------------------------------------
@@ -69,19 +72,21 @@ function slotsFromRows(rows: SlotRow[]): Slot[] {
 // --- cloud ----------------------------------------------------------------------
 
 const cloudStore: MatchStore = {
-  async list() {
+  async list(groupId) {
     const { data, error } = await supabase!
       .from('matches')
       .select('*')
+      .eq('group_id', groupId)
       .order('scheduled_at', { ascending: false })
     if (error) throw error
     return (data as MatchRow[]).map(fromRow)
   },
 
-  async create(draft, formationA, formationB) {
+  async create(groupId, draft, formationA, formationB) {
     const { data, error } = await supabase!
       .from('matches')
       .insert({
+        group_id: groupId,
         scheduled_at: draft.scheduledAt,
         cancha: draft.cancha,
         team_size: draft.teamSize,
@@ -94,7 +99,7 @@ const cloudStore: MatchStore = {
     return fromRow(data as MatchRow)
   },
 
-  async saveSlots(matchId, team, slots) {
+  async saveSlots(_groupId, matchId, team, slots) {
     const { error } = await supabase!.from('match_slots').upsert(
       slots.map((s) => ({
         match_id: matchId,
@@ -107,13 +112,13 @@ const cloudStore: MatchStore = {
     if (error) throw error
   },
 
-  async setFormation(matchId, team, formationId) {
+  async setFormation(_groupId, matchId, team, formationId) {
     const column = team === 'A' ? 'formation_a' : 'formation_b'
     const { error } = await supabase!.from('matches').update({ [column]: formationId }).eq('id', matchId)
     if (error) throw error
   },
 
-  async loadSlots(matchId) {
+  async loadSlots(_groupId, matchId) {
     const { data, error } = await supabase!.from('match_slots').select('*').eq('match_id', matchId)
     if (error) throw error
     const rows = data as SlotRow[]
@@ -123,7 +128,7 @@ const cloudStore: MatchStore = {
     }
   },
 
-  async loadAllSlots(matchIds) {
+  async loadAllSlots(_groupId, matchIds) {
     const result = new Map<string, { A: Slot[]; B: Slot[] }>()
     if (matchIds.length === 0) return result
     const { data, error } = await supabase!.from('match_slots').select('*').in('match_id', matchIds)
@@ -139,7 +144,7 @@ const cloudStore: MatchStore = {
     return result
   },
 
-  async setResult(matchId, scoreA, scoreB) {
+  async setResult(_groupId, matchId, scoreA, scoreB) {
     const { data, error } = await supabase!
       .from('matches')
       .update({ score_a: scoreA, score_b: scoreB })
@@ -153,45 +158,45 @@ const cloudStore: MatchStore = {
 
 // --- local ------------------------------------------------------------------------
 
-const MATCHES_KEY = 'fulbito.matches.v1'
-const SLOTS_KEY = 'fulbito.match_slots.v1'
+const matchesKey = (groupId: string) => `fulbito.${groupId}.matches.v1`
+const slotsKey = (groupId: string) => `fulbito.${groupId}.match_slots.v1`
 
 type LocalSlots = Record<string, { A: Slot[]; B: Slot[] }>
 
-function readMatches(): Match[] {
+function readMatches(groupId: string): Match[] {
   try {
-    const raw = localStorage.getItem(MATCHES_KEY)
+    const raw = localStorage.getItem(matchesKey(groupId))
     return raw ? (JSON.parse(raw) as Match[]) : []
   } catch {
     return []
   }
 }
 
-function writeMatches(matches: Match[]) {
-  localStorage.setItem(MATCHES_KEY, JSON.stringify(matches))
+function writeMatches(groupId: string, matches: Match[]) {
+  localStorage.setItem(matchesKey(groupId), JSON.stringify(matches))
 }
 
-function readAllSlots(): LocalSlots {
+function readAllSlots(groupId: string): LocalSlots {
   try {
-    const raw = localStorage.getItem(SLOTS_KEY)
+    const raw = localStorage.getItem(slotsKey(groupId))
     return raw ? (JSON.parse(raw) as LocalSlots) : {}
   } catch {
     return {}
   }
 }
 
-function writeAllSlots(slots: LocalSlots) {
-  localStorage.setItem(SLOTS_KEY, JSON.stringify(slots))
+function writeAllSlots(groupId: string, slots: LocalSlots) {
+  localStorage.setItem(slotsKey(groupId), JSON.stringify(slots))
 }
 
 const localStore: MatchStore = {
-  async list() {
-    return readMatches().sort(
+  async list(groupId) {
+    return readMatches(groupId).sort(
       (a, b) => new Date(b.scheduledAt).getTime() - new Date(a.scheduledAt).getTime(),
     )
   },
 
-  async create(draft, formationA, formationB) {
+  async create(groupId, draft, formationA, formationB) {
     const match: Match = {
       id: crypto.randomUUID(),
       scheduledAt: draft.scheduledAt,
@@ -203,43 +208,43 @@ const localStore: MatchStore = {
       scoreB: null,
       createdAt: new Date().toISOString(),
     }
-    writeMatches([...readMatches(), match])
+    writeMatches(groupId, [...readMatches(groupId), match])
     return match
   },
 
-  async saveSlots(matchId, team, slots) {
-    const all = readAllSlots()
+  async saveSlots(groupId, matchId, team, slots) {
+    const all = readAllSlots(groupId)
     const current = all[matchId] ?? { A: [], B: [] }
     all[matchId] = { ...current, [team]: slots }
-    writeAllSlots(all)
+    writeAllSlots(groupId, all)
   },
 
-  async setFormation(matchId, team, formationId) {
-    const matches = readMatches()
+  async setFormation(groupId, matchId, team, formationId) {
+    const matches = readMatches(groupId)
     const index = matches.findIndex((m) => m.id === matchId)
     if (index === -1) throw new Error(`No existe la fecha ${matchId}`)
     const column = team === 'A' ? 'formationA' : 'formationB'
     matches[index] = { ...matches[index], [column]: formationId }
-    writeMatches(matches)
+    writeMatches(groupId, matches)
   },
 
-  async loadSlots(matchId) {
-    return readAllSlots()[matchId] ?? { A: [], B: [] }
+  async loadSlots(groupId, matchId) {
+    return readAllSlots(groupId)[matchId] ?? { A: [], B: [] }
   },
 
-  async loadAllSlots(matchIds) {
-    const all = readAllSlots()
+  async loadAllSlots(groupId, matchIds) {
+    const all = readAllSlots(groupId)
     const result = new Map<string, { A: Slot[]; B: Slot[] }>()
     for (const id of matchIds) result.set(id, all[id] ?? { A: [], B: [] })
     return result
   },
 
-  async setResult(matchId, scoreA, scoreB) {
-    const matches = readMatches()
+  async setResult(groupId, matchId, scoreA, scoreB) {
+    const matches = readMatches(groupId)
     const index = matches.findIndex((m) => m.id === matchId)
     if (index === -1) throw new Error(`No existe la fecha ${matchId}`)
     matches[index] = { ...matches[index], scoreA, scoreB }
-    writeMatches(matches)
+    writeMatches(groupId, matches)
     return matches[index]
   },
 }

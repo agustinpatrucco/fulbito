@@ -47,6 +47,7 @@ export function PlayerForm({ player, initialName, onSave, onDelete, onDone }: Pr
     photoPath,
     active,
     createdAt: player?.createdAt ?? new Date().toISOString(),
+    isAdmin: player?.isAdmin ?? false,
   }
 
   async function handlePhoto(file: File) {

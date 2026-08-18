@@ -20,10 +20,20 @@ export type Player = {
   photoPath: string | null
   active: boolean
   createdAt: string
+  /** The first player created in a group becomes its admin. Never settable through the
+      general edit form — only decided once, at creation. */
+  isAdmin: boolean
 }
 
-/** What the forms hand to the store — no id, no timestamp. */
-export type PlayerDraft = Omit<Player, 'id' | 'createdAt'>
+/** What the forms hand to the store — no id, no timestamp, and no isAdmin: that flag
+    is decided once at creation, never editable afterwards. */
+export type PlayerDraft = Omit<Player, 'id' | 'createdAt' | 'isAdmin'>
+
+/** One separate roster, unlocked by its own 6-character code. */
+export type Group = {
+  id: string
+  code: string
+}
 
 export type TeamId = 'A' | 'B'
 export type TeamSize = 6 | 7
