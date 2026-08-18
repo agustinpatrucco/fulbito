@@ -20,7 +20,7 @@ const EMPTY_SLOTS: SlotsByTeam = { A: [], B: [] }
  * "Current" match is whichever fecha has the latest kickoff time — editable on the
  * pitch until that moment passes, then locked and waiting for a result.
  */
-export function useMatches(byId: Map<string, Player>) {
+export function useMatches(groupId: string, byId: Map<string, Player>) {
   const [matches, setMatches] = useState<Match[]>([])
   const [slotsByMatch, setSlotsByMatch] = useState<Map<string, SlotsByTeam>>(new Map())
   const [loading, setLoading] = useState(true)
@@ -33,8 +33,11 @@ export function useMatches(byId: Map<string, Player>) {
 
   const reload = useCallback(async () => {
     try {
-      const list = await matchStore.list()
-      const loaded = await matchStore.loadAllSlots(list.map((m) => m.id))
+      const list = await matchStore.list(groupId)
+      const loaded = await matchStore.loadAllSlots(
+        groupId,
+        list.map((m) => m.id),
+      )
       setMatches(list)
       setSlotsByMatch(loaded)
       setError(null)
@@ -43,7 +46,7 @@ export function useMatches(byId: Map<string, Player>) {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [groupId])
 
   useEffect(() => {
     reload()
@@ -72,17 +75,20 @@ export function useMatches(byId: Map<string, Player>) {
 
   /** Optimistic local update, persisted in the background; a failure surfaces as an error
       and the next reload wins, rather than trying to hand-roll a rollback. */
-  const persistSlots = useCallback((matchId: string, team: TeamId, next: Slot[]) => {
-    setSlotsByMatch((prev) => {
-      const map = new Map(prev)
-      const current = map.get(matchId) ?? EMPTY_SLOTS
-      map.set(matchId, { ...current, [team]: next })
-      return map
-    })
-    matchStore.saveSlots(matchId, team, next).catch((e) => {
-      setError(errorMessage(e, 'No se pudo guardar el equipo'))
-    })
-  }, [])
+  const persistSlots = useCallback(
+    (matchId: string, team: TeamId, next: Slot[]) => {
+      setSlotsByMatch((prev) => {
+        const map = new Map(prev)
+        const current = map.get(matchId) ?? EMPTY_SLOTS
+        map.set(matchId, { ...current, [team]: next })
+        return map
+      })
+      matchStore.saveSlots(groupId, matchId, team, next).catch((e) => {
+        setError(errorMessage(e, 'No se pudo guardar el equipo'))
+      })
+    },
+    [groupId],
+  )
 
   const tapSlot = useCallback(
     (team: TeamId, index: number) => {
@@ -136,7 +142,7 @@ export function useMatches(byId: Map<string, Player>) {
       if (!currentMatch || locked) return
       const formation = getFormation(formationId)
       const { slots: nextSlots } = refit(slots[team], formation, byId)
-      matchStore.setFormation(currentMatch.id, team, formationId).catch((e) => {
+      matchStore.setFormation(groupId, currentMatch.id, team, formationId).catch((e) => {
         setError(errorMessage(e, 'No se pudo cambiar la formación'))
       })
       setMatches((prev) =>
@@ -148,7 +154,7 @@ export function useMatches(byId: Map<string, Player>) {
       )
       persistSlots(currentMatch.id, team, nextSlots)
     },
-    [currentMatch, locked, slots, byId, persistSlots],
+    [currentMatch, locked, slots, byId, persistSlots, groupId],
   )
 
   const fillTeam = useCallback(
@@ -188,23 +194,26 @@ export function useMatches(byId: Map<string, Player>) {
     async (draft: MatchDraft) => {
       const formationId = DEFAULT_FORMATION[draft.teamSize]
       const formation = getFormation(formationId)
-      const match = await matchStore.create(draft, formationId, formationId)
+      const match = await matchStore.create(groupId, draft, formationId, formationId)
       const emptySlots = buildSlots(formation)
       await Promise.all([
-        matchStore.saveSlots(match.id, 'A', emptySlots),
-        matchStore.saveSlots(match.id, 'B', emptySlots),
+        matchStore.saveSlots(groupId, match.id, 'A', emptySlots),
+        matchStore.saveSlots(groupId, match.id, 'B', emptySlots),
       ])
       await reload()
       return match
     },
-    [reload],
+    [reload, groupId],
   )
 
   /** Works on any match, not just the current one — Historial can correct an old score. */
-  const setResult = useCallback(async (matchId: string, scoreA: number, scoreB: number) => {
-    const updated = await matchStore.setResult(matchId, scoreA, scoreB)
-    setMatches((prev) => prev.map((m) => (m.id === updated.id ? updated : m)))
-  }, [])
+  const setResult = useCallback(
+    async (matchId: string, scoreA: number, scoreB: number) => {
+      const updated = await matchStore.setResult(groupId, matchId, scoreA, scoreB)
+      setMatches((prev) => prev.map((m) => (m.id === updated.id ? updated : m)))
+    },
+    [groupId],
+  )
 
   return {
     matches,

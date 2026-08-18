@@ -4,6 +4,8 @@ Armador de equipos para los partidos con amigos, al estilo del modo plantilla de
 Cada amigo es una carta (oro / plata / bronce) y los equipos se arman poniendo cartas en
 la cancha.
 
+- **Grupos**: cada grupo de amigos tiene su propio Plantel/Partido/Historial, separado
+  del resto, y se accede con un código de 6 caracteres — nada de esto es buscable
 - Dos equipos de **6** jugadores, con opción a **7**
 - Posiciones **POR / DFC / MC / DC**; un jugador fuera de su puesto queda con **contorno rojo**
 - Se arman **tocando** las cartas, o **pegando la lista** de WhatsApp
@@ -32,22 +34,16 @@ seguí los pasos de abajo.
 
 ---
 
-## Conectar Supabase (para que el plantel te siga entre dispositivos)
+## Conectar Supabase (para que los grupos sigan entre dispositivos)
 
 **1. Creá el proyecto.** En [supabase.com](https://supabase.com) → *New project* (plan
 gratis). Anotá la contraseña de la base cuando te la pida.
 
 **2. Creá las tablas.** En el panel: *SQL Editor* → *New query* → pegá todo el contenido
-de [`supabase/schema.sql`](supabase/schema.sql) → *Run*. Eso crea las tablas, activa Row
-Level Security y crea el bucket de fotos.
+de [`supabase/schema.sql`](supabase/schema.sql) → *Run*. Eso crea las tablas (incluida
+`groups`), activa Row Level Security y crea el bucket de fotos.
 
-**3. Creá el único usuario.** *Authentication* → *Users* → *Add user* → *Create new user*:
-
-- Email: `fulbito@fulbito.local`
-- Password: la contraseña compartida que vas a usar en la app
-- Tildá **Auto Confirm User** (si no, Supabase espera una confirmación por mail que nunca va a llegar)
-
-**4. Copiá las claves.** *Project Settings* → **API Keys**. Supabase separó esto en dos
+**3. Copiá las claves.** *Project Settings* → **API Keys**. Supabase separó esto en dos
 secciones — usá la de arriba:
 
 - **Publishable and secret API keys** → copiá la **Publishable key** (es el reemplazo
@@ -66,35 +62,43 @@ Con ambos datos, creá un archivo `.env` en la raíz (usá `.env.example` como m
 ```
 VITE_SUPABASE_URL=https://xxxxxxxx.supabase.co
 VITE_SUPABASE_ANON_KEY=eyJhbGci...   # o sb_publishable_...
-VITE_FULBITO_EMAIL=fulbito@fulbito.local
 ```
 
-Reiniciá `npm run dev`. El cartel de MODO LOCAL desaparece y aparece el botón **Editar**.
+Reiniciá `npm run dev`. El cartel de MODO LOCAL desaparece.
 
 ### Si ya habías corrido schema.sql antes
 
-Las fechas (`matches`) cambiaron de forma — ahora llevan hora, cancha y resultado en vez
-de solo una fecha del día. Si tu proyecto de Supabase ya tenía la tabla vieja (nunca se
-llegó a usar, así que no hay datos que perder), corré una vez
-[`supabase/migrations/0002_fecha_result.sql`](supabase/migrations/0002_fecha_result.sql)
-en el SQL Editor. Después corré también
-[`supabase/migrations/0003_open_writes.sql`](supabase/migrations/0003_open_writes.sql)
-(ver más abajo por qué). Un proyecto nuevo no necesita ninguno de los dos — alcanza con
-`schema.sql`.
+Corré, en orden, los archivos de `supabase/migrations/` que todavía no hayas corrido:
+
+1. [`0002_fecha_result.sql`](supabase/migrations/0002_fecha_result.sql) — las fechas
+   (`matches`) pasan a llevar hora, cancha y resultado.
+2. [`0003_open_writes.sql`](supabase/migrations/0003_open_writes.sql) — abre los writes
+   a cualquiera con el link (ver "Sobre la seguridad").
+3. [`0004_groups.sql`](supabase/migrations/0004_groups.sql) — agrega los Grupos y migra
+   todo lo que ya tenías a uno con código `consti`. **Antes de correrlo**, revisá el
+   comentario cerca del final del archivo: hay un `update` que marca como admin al
+   jugador cuyo nombre matchee `%patrucco%` — confirmá que le pega a un solo jugador
+   (con el `select` que está comentado justo arriba) antes de correr el `update`.
+
+Un proyecto nuevo no necesita ninguna de las tres — alcanza con `schema.sql`.
 
 ### Sobre la seguridad
 
-Cualquiera con el link puede **ver y modificar** el plantel, las fechas y los
-resultados — eso lo permite Row Level Security del lado del servidor, no algo que haga
-el navegador. No hay una cuenta por persona: alguien "inicia sesión" simplemente
-eligiendo su propio nombre en Plantel, sin contraseña, así que no hay ningún token de
-Supabase distinto por persona contra el cual chequear un `insert` o un `delete`.
+Dentro de un grupo, cualquiera con su código puede **ver y modificar** el plantel, las
+fechas y los resultados — eso lo permite Row Level Security del lado del servidor, no
+algo que haga el navegador. No hay una cuenta por persona: alguien "inicia sesión"
+simplemente eligiendo su propio nombre en Plantel (o creándose si es nuevo), sin
+contraseña, así que no hay ningún token de Supabase distinto por persona contra el cual
+chequear un `insert` o un `delete`. El primer jugador creado en un grupo queda marcado
+como su admin — es lo único que distingue permisos dentro de un grupo (crear/eliminar
+jugadores, agregar partidos anteriores), y es un flag del lado del cliente, no algo que
+Row Level Security verifique.
 
-Lo único que sigue detrás de la contraseña compartida (la cuenta de Supabase Auth de
-más arriba) son las acciones de **admin**: crear o eliminar jugadores, y agregar
-partidos anteriores al historial. Esa contraseña sigue siendo válida — Supabase la
-verifica igual que antes — pero ahora es un permiso extra dentro de la app, no la
-puerta de entrada para poder editar en general.
+Lo que sí está protegido de verdad es **encontrar** un grupo: la tabla `groups` no es
+legible ni escribible directamente por nadie — la única puerta de entrada son las
+funciones `get_group_by_code`/`create_group` (ver `schema.sql`), que hacen una búsqueda
+exacta por código. No hay ningún endpoint que permita listar o adivinar todos los
+códigos que existen.
 
 Por eso la `anon key` puede ir en el bundle sin problema — está pensada para ser
 pública. Lo que **nunca** hay que publicar es la `service_role key`.
@@ -107,12 +111,15 @@ pública. Lo que **nunca** hay que publicar es la `service_role key`.
 2. En Netlify: *Add new site* → *Import an existing project* → elegí el repo.
    El `netlify.toml` ya trae el comando (`npm run build`), la carpeta (`dist`) y el
    redirect de SPA, así que no hay que tocar nada.
-3. *Site configuration* → *Environment variables*: agregá las mismas tres variables
+3. *Site configuration* → *Environment variables*: agregá las mismas dos variables
    `VITE_...` del `.env`.
 4. *Deploys* → *Trigger deploy* para que tome las variables.
 
 > Si no cargás las variables el sitio igual funciona, pero arranca en modo local y cada
-> dispositivo ve su propio plantel.
+> dispositivo ve su propio grupo, sin compartir nada entre sí.
+
+Tu link de siempre sigue funcionando: agregale `/consti` para volver al grupo
+migrado — por ejemplo `fulbo-pibes.netlify.app/consti`.
 
 ---
 
@@ -152,19 +159,39 @@ crear en el momento con **Crear**.
 
 ---
 
+## Grupos
+
+Cada grupo de amigos tiene su propio Plantel, Partido e Historial, separado del resto.
+No hay forma de buscarlos ni listarlos — para entrar a uno hace falta su código de 6
+caracteres, y se accede en `tu-sitio.netlify.app/<código>` (por ejemplo,
+`fulbo-pibes.netlify.app/consti`).
+
+Sin código en la URL, la app muestra dos opciones:
+
+- **Crear grupo nuevo**: genera un código al azar y te deja ahí — compartiselo a tus
+  amigos para que se unan.
+- **Unite con un código**: si ya tenés uno.
+
+Una vez dentro de un grupo, no hay ningún selector para volver a otro — se accede
+revisitando su URL (guardala o mandátela a vos mismo).
+
+---
+
 ## Iniciar sesión
 
-Con **Editar**, arriba a la derecha, hay dos caminos:
+Dentro de un grupo, si no elegiste todavía quién sos, el cartel para hacerlo aparece
+solo. Dos caminos:
 
-- **Elegir tu jugador**: tocás tu propia carta en la lista y listo, sin contraseña. Desde
-  ahí podés editar tu carta, crear fechas, armar los equipos (tocando o pegando la
-  lista) y cargar resultados — todo menos crear/eliminar jugadores y agregar partidos
-  anteriores al historial.
-- **¿Sos admin?**: la contraseña compartida de siempre. Suma esas dos acciones que le
-  faltan al modo jugador, y además deja editar la carta de cualquiera, no solo la
-  propia.
+- **Elegir tu jugador**: tocás tu propia carta en la lista, sin contraseña. Desde ahí
+  podés editar tu carta (pestaña **Mi perfil**), crear fechas, armar los equipos
+  (tocando o pegando la lista) y cargar resultados.
+- **+ Crear jugador**: si sos nuevo en el grupo, creá tu carta ahí mismo. El primer
+  jugador creado en un grupo recién creado queda marcado automáticamente como su
+  **admin** — solo un admin puede crear/eliminar otros jugadores, editar la carta de
+  cualquiera (no solo la propia), y agregar partidos anteriores al historial.
 
-La sesión (la tuya o la de admin) queda guardada en el dispositivo, como antes.
+La sesión queda guardada en el dispositivo, separada por grupo — elegir tu jugador en
+uno no afecta a los demás grupos a los que te hayas unido.
 
 ---
 
@@ -218,19 +245,21 @@ npm run build
 
 ```
 src/
-  types.ts                    posiciones, categorías, Player, Slot, Match
+  types.ts                    posiciones, categorías, Player, Slot, Match, Group
   config/cardLayout.ts        coordenadas de las cartas  ← ajustar acá
   data/formations.ts          formaciones de 6 y de 7
   lib/supabase.ts             cliente (null = modo local)
-  lib/store.ts                CRUD de jugadores, backend intercambiable
-  lib/matchStore.ts           CRUD de fechas y alineaciones, backend intercambiable
-  lib/auth.ts                 login de admin con la contraseña compartida
-  lib/playerSession.ts        login como jugador (elegís tu carta, sin contraseña)
-  features/players/           carta, formulario, plantel, subida de fotos
+  lib/group.ts                resuelve el código de grupo de la URL (crear/unirse)
+  lib/store.ts                CRUD de jugadores, backend intercambiable, por grupo
+  lib/matchStore.ts           CRUD de fechas y alineaciones, backend intercambiable, por grupo
+  lib/playerSession.ts        login como jugador (elegís o creás tu carta), por grupo
+  features/group/             pantalla de crear/unirse a un grupo
+  features/players/           carta, formulario, plantel, mi perfil, subida de fotos
   features/squad/             cancha, banco, tap-to-assign
   features/matches/           fecha, bloqueo, resultado, historial, racha (con tests)
   features/import/            parser + matcher de la lista pegada (con tests)
-supabase/schema.sql                          tablas, RLS y bucket de fotos (proyecto nuevo)
+supabase/schema.sql                          tablas, RLS, RPCs y bucket de fotos (proyecto nuevo)
 supabase/migrations/0002_fecha_result.sql     al día la tabla matches (proyecto existente)
 supabase/migrations/0003_open_writes.sql      abre los writes a cualquiera con el link
+supabase/migrations/0004_groups.sql           agrega Grupos y migra todo a "consti"
 ```

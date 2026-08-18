@@ -4,13 +4,15 @@ import { supabase, isCloudMode } from './supabase'
 /**
  * One interface, two backends. Cloud mode talks to Supabase so the roster follows you
  * between phone and laptop; local mode keeps everything in localStorage so the app is
- * fully usable before a Supabase project is set up.
+ * fully usable before a Supabase project is set up. Every method takes the active
+ * group's id first — each group is a fully separate roster.
  */
 export type PlayerStore = {
-  list(): Promise<Player[]>
-  create(draft: PlayerDraft): Promise<Player>
-  update(id: string, patch: Partial<PlayerDraft>): Promise<Player>
-  remove(id: string): Promise<void>
+  list(groupId: string): Promise<Player[]>
+  /** isAdmin is true only for the very first player created in an empty group. */
+  create(groupId: string, draft: PlayerDraft, isAdmin: boolean): Promise<Player>
+  update(groupId: string, id: string, patch: Partial<PlayerDraft>): Promise<Player>
+  remove(groupId: string, id: string): Promise<void>
 }
 
 // --- row mapping ------------------------------------------------------------
@@ -26,6 +28,7 @@ type PlayerRow = {
   photo_path: string | null
   active: boolean
   created_at: string
+  is_admin: boolean
 }
 
 function fromRow(row: PlayerRow): Player {
@@ -40,6 +43,7 @@ function fromRow(row: PlayerRow): Player {
     photoPath: row.photo_path,
     active: row.active,
     createdAt: row.created_at,
+    isAdmin: row.is_admin,
   }
 }
 
@@ -59,26 +63,27 @@ function toRow(draft: Partial<PlayerDraft>): Partial<PlayerRow> {
 // --- cloud ------------------------------------------------------------------
 
 const cloudStore: PlayerStore = {
-  async list() {
+  async list(groupId) {
     const { data, error } = await supabase!
       .from('players')
       .select('*')
+      .eq('group_id', groupId)
       .order('name', { ascending: true })
     if (error) throw error
     return (data as PlayerRow[]).map(fromRow)
   },
 
-  async create(draft) {
+  async create(groupId, draft, isAdmin) {
     const { data, error } = await supabase!
       .from('players')
-      .insert(toRow(draft))
+      .insert({ ...toRow(draft), group_id: groupId, is_admin: isAdmin })
       .select()
       .single()
     if (error) throw error
     return fromRow(data as PlayerRow)
   },
 
-  async update(id, patch) {
+  async update(_groupId, id, patch) {
     const { data, error } = await supabase!
       .from('players')
       .update(toRow(patch))
@@ -89,7 +94,7 @@ const cloudStore: PlayerStore = {
     return fromRow(data as PlayerRow)
   },
 
-  async remove(id) {
+  async remove(_groupId, id) {
     const { error } = await supabase!.from('players').delete().eq('id', id)
     if (error) throw error
   },
@@ -97,11 +102,11 @@ const cloudStore: PlayerStore = {
 
 // --- local ------------------------------------------------------------------
 
-const LOCAL_KEY = 'fulbito.players.v1'
+const localKey = (groupId: string) => `fulbito.${groupId}.players.v1`
 
-function readLocal(): Player[] {
+function readLocal(groupId: string): Player[] {
   try {
-    const raw = localStorage.getItem(LOCAL_KEY)
+    const raw = localStorage.getItem(localKey(groupId))
     return raw ? (JSON.parse(raw) as Player[]) : []
   } catch {
     // A corrupt blob shouldn't brick the app; start over rather than crash on boot.
@@ -109,36 +114,37 @@ function readLocal(): Player[] {
   }
 }
 
-function writeLocal(players: Player[]) {
-  localStorage.setItem(LOCAL_KEY, JSON.stringify(players))
+function writeLocal(groupId: string, players: Player[]) {
+  localStorage.setItem(localKey(groupId), JSON.stringify(players))
 }
 
 const localStore: PlayerStore = {
-  async list() {
-    return readLocal().sort((a, b) => a.name.localeCompare(b.name, 'es'))
+  async list(groupId) {
+    return readLocal(groupId).sort((a, b) => a.name.localeCompare(b.name, 'es'))
   },
 
-  async create(draft) {
+  async create(groupId, draft, isAdmin) {
     const player: Player = {
       ...draft,
       id: crypto.randomUUID(),
       createdAt: new Date().toISOString(),
+      isAdmin,
     }
-    writeLocal([...readLocal(), player])
+    writeLocal(groupId, [...readLocal(groupId), player])
     return player
   },
 
-  async update(id, patch) {
-    const players = readLocal()
+  async update(groupId, id, patch) {
+    const players = readLocal(groupId)
     const index = players.findIndex((p) => p.id === id)
     if (index === -1) throw new Error(`No existe el jugador ${id}`)
     players[index] = { ...players[index], ...patch }
-    writeLocal(players)
+    writeLocal(groupId, players)
     return players[index]
   },
 
-  async remove(id) {
-    writeLocal(readLocal().filter((p) => p.id !== id))
+  async remove(groupId, id) {
+    writeLocal(groupId, readLocal(groupId).filter((p) => p.id !== id))
   },
 }
 

@@ -1,29 +1,30 @@
 import { useState } from 'react'
-import type { Player } from '../types'
+import type { Player, PlayerDraft } from '../types'
 import { displayName } from '../types'
-import { Button, Field, Input } from './ui'
+import { Input } from './ui'
 import { Modal } from './Modal'
 import { PlayerCard } from '../features/players/PlayerCard'
+import { PlayerForm } from '../features/players/PlayerForm'
 
 type Props = {
   open: boolean
   onClose: () => void
   players: Player[]
   onSelectPlayer: (id: string) => void
-  signIn: (password: string) => Promise<{ error: string | null }>
+  onCreatePlayer: (draft: PlayerDraft) => Promise<Player>
 }
 
 /**
- * Two ways in: pick your own card (no password — that's the point), or the "¿Sos
- * admin?" link for the shared password. Same modal, so nobody has to know in advance
- * which one they need.
+ * Pick your own card — no password, that's the point. The very first player created
+ * in a group becomes its admin (see `usePlayers.create`), so "+ Crear jugador" here is
+ * also how a brand-new Grupo gets its first admin.
  */
-export function SessionGate({ open, onClose, players, onSelectPlayer, signIn }: Props) {
-  const [mode, setMode] = useState<'player' | 'admin'>('player')
+export function SessionGate({ open, onClose, players, onSelectPlayer, onCreatePlayer }: Props) {
+  const [mode, setMode] = useState<'pick' | 'create'>('pick')
   const [query, setQuery] = useState('')
 
   function close() {
-    setMode('player')
+    setMode('pick')
     setQuery('')
     onClose()
   }
@@ -35,8 +36,8 @@ export function SessionGate({ open, onClose, players, onSelectPlayer, signIn }: 
   )
 
   return (
-    <Modal open={open} title={mode === 'player' ? 'Elegí tu jugador' : 'Modo admin'} onClose={close}>
-      {mode === 'player' ? (
+    <Modal open={open} title={mode === 'pick' ? 'Elegí tu jugador' : 'Jugador nuevo'} onClose={close}>
+      {mode === 'pick' ? (
         <div className="space-y-3">
           <Input
             value={query}
@@ -47,7 +48,7 @@ export function SessionGate({ open, onClose, players, onSelectPlayer, signIn }: 
 
           {players.length === 0 ? (
             <p className="py-6 text-center text-sm text-white/40">
-              Todavía no hay jugadores cargados en Plantel.
+              Todavía no hay jugadores en este grupo. Creá el primero.
             </p>
           ) : (
             <div className="grid max-h-80 grid-cols-3 gap-3 overflow-y-auto sm:grid-cols-4">
@@ -70,69 +71,31 @@ export function SessionGate({ open, onClose, players, onSelectPlayer, signIn }: 
 
           <button
             type="button"
-            onClick={() => setMode('admin')}
-            className="text-xs text-white/40 underline underline-offset-2 hover:text-white/70"
+            onClick={() => setMode('create')}
+            className="text-xs text-emerald-300 underline underline-offset-2 hover:text-emerald-200"
           >
-            ¿Sos admin?
+            + Crear jugador
           </button>
         </div>
       ) : (
-        <AdminForm signIn={signIn} onDone={close} onBack={() => setMode('player')} />
+        <div className="space-y-3">
+          <button
+            type="button"
+            onClick={() => setMode('pick')}
+            className="text-xs text-white/40 underline underline-offset-2 hover:text-white/70"
+          >
+            ‹ Volver
+          </button>
+          <PlayerForm
+            onSave={async (draft) => {
+              const player = await onCreatePlayer(draft)
+              onSelectPlayer(player.id)
+              return player
+            }}
+            onDone={close}
+          />
+        </div>
       )}
     </Modal>
-  )
-}
-
-function AdminForm({
-  signIn,
-  onDone,
-  onBack,
-}: {
-  signIn: (password: string) => Promise<{ error: string | null }>
-  onDone: () => void
-  onBack: () => void
-}) {
-  const [password, setPassword] = useState('')
-  const [error, setError] = useState<string | null>(null)
-  const [busy, setBusy] = useState(false)
-
-  async function submit(e: React.FormEvent) {
-    e.preventDefault()
-    setBusy(true)
-    const result = await signIn(password)
-    setBusy(false)
-    if (result.error) return setError(result.error)
-    onDone()
-  }
-
-  return (
-    <form onSubmit={submit} className="space-y-3">
-      <p className="text-sm text-white/60">
-        Ingresá la contraseña de admin. Solo hace falta una vez por dispositivo.
-      </p>
-      <Field label="Contraseña">
-        <Input
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          autoFocus
-          autoComplete="current-password"
-        />
-      </Field>
-      {error && <p className="text-sm text-red-400">{error}</p>}
-      <div className="flex gap-2">
-        <Button type="button" onClick={onBack} disabled={busy}>
-          Volver
-        </Button>
-        <Button
-          type="submit"
-          variant="primary"
-          className="flex-1"
-          disabled={busy || !password}
-        >
-          {busy ? 'Entrando…' : 'Entrar'}
-        </Button>
-      </div>
-    </form>
   )
 }

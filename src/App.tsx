@@ -1,39 +1,62 @@
-import { useMemo, useState } from 'react'
-import { useAuth } from './lib/auth'
+import { useEffect, useMemo, useState } from 'react'
+import { useGroup } from './lib/group'
 import { usePlayerSession } from './lib/playerSession'
 import { isCloudMode } from './lib/supabase'
 import { SessionGate } from './components/SessionGate'
 import { displayName } from './types'
+import type { Group } from './types'
+import { GroupLanding } from './features/group/GroupLanding'
 import { usePlayers } from './features/players/usePlayers'
 import { RosterPage } from './features/players/RosterPage'
+import { MiPerfilPage } from './features/players/MiPerfilPage'
 import { PitchPage } from './features/squad/PitchPage'
 import { useMatches } from './features/matches/useMatches'
 import { HistorialPage } from './features/matches/HistorialPage'
 
-type Tab = 'partido' | 'historial' | 'plantel'
+type Tab = 'partido' | 'historial' | 'plantel' | 'perfil'
 
 const TAB_LABELS: Record<Tab, string> = {
   partido: 'Partido',
   historial: 'Historial',
   plantel: 'Plantel',
+  perfil: 'Mi perfil',
 }
 
 export default function App() {
+  const { group, status, notFoundCode, createGroup, joinByCode } = useGroup()
+
+  if (status === 'loading') {
+    return <p className="flex h-dvh items-center justify-center text-white/40">Cargando…</p>
+  }
+
+  if (status === 'landing' || status === 'not-found') {
+    return <GroupLanding notFoundCode={notFoundCode} onCreate={createGroup} onJoin={joinByCode} />
+  }
+
+  return <GroupApp group={group!} />
+}
+
+function GroupApp({ group }: { group: Group }) {
   const [tab, setTab] = useState<Tab>('partido')
   const [gateOpen, setGateOpen] = useState(false)
-  const admin = useAuth()
-  const roster = usePlayers()
-  const playerSession = usePlayerSession(roster.players)
-  const matches = useMatches(roster.byId)
+  const roster = usePlayers(group.id)
+  const playerSession = usePlayerSession(group.code, roster.players)
+  const matches = useMatches(group.id, roster.byId)
 
-  const isAdmin = admin.canEdit
-  const sessionPlayer = isAdmin ? null : playerSession.player
-  const canEdit = isAdmin || sessionPlayer !== null
+  const sessionPlayer = playerSession.player
+  const isAdmin = sessionPlayer?.isAdmin ?? false
+  const canEdit = sessionPlayer !== null
 
-  function signOut() {
-    admin.signOut()
-    playerSession.clearSession()
-  }
+  // Nobody's picked a player yet on this device — surface the gate right away instead
+  // of waiting for someone to notice the "Editar" button.
+  useEffect(() => {
+    if (!roster.loading && !sessionPlayer) setGateOpen(true)
+  }, [roster.loading, sessionPlayer])
+
+  const tabs: Tab[] =
+    sessionPlayer !== null
+      ? ['partido', 'historial', 'plantel', 'perfil']
+      : ['partido', 'historial', 'plantel']
 
   const streaks = useMemo(
     () => new Map([...matches.stats].map(([id, s]) => [id, s.streak])),
@@ -48,7 +71,7 @@ export default function App() {
         </span>
 
         <nav className="ml-3 flex overflow-hidden rounded-lg border border-white/10">
-          {(['partido', 'historial', 'plantel'] as Tab[]).map((t) => (
+          {tabs.map((t) => (
             <button
               key={t}
               type="button"
@@ -71,22 +94,19 @@ export default function App() {
               MODO LOCAL
             </span>
           )}
-          {isCloudMode && admin.ready && (
-            <>
-              {canEdit && (
-                <span className="hidden text-xs text-white/50 sm:block">
-                  {isAdmin ? 'Admin' : displayName(sessionPlayer!)}
-                </span>
-              )}
-              <button
-                type="button"
-                onClick={() => (canEdit ? signOut() : setGateOpen(true))}
-                className="rounded-lg border border-white/10 px-2.5 py-1.5 text-xs text-white/60 hover:text-white"
-              >
-                {canEdit ? 'Salir' : 'Editar'}
-              </button>
-            </>
+          {canEdit && (
+            <span className="hidden text-xs text-white/50 sm:block">
+              {displayName(sessionPlayer)}
+              {isAdmin && ' · admin'}
+            </span>
           )}
+          <button
+            type="button"
+            onClick={() => (canEdit ? playerSession.clearSession() : setGateOpen(true))}
+            className="rounded-lg border border-white/10 px-2.5 py-1.5 text-xs text-white/60 hover:text-white"
+          >
+            {canEdit ? 'Salir' : 'Editar'}
+          </button>
         </div>
       </header>
 
@@ -107,12 +127,18 @@ export default function App() {
         </div>
       )}
 
+      {tab === 'perfil' && sessionPlayer && (
+        <div className="flex-1 overflow-y-auto">
+          <MiPerfilPage player={sessionPlayer} roster={roster} />
+        </div>
+      )}
+
       <SessionGate
         open={gateOpen}
         onClose={() => setGateOpen(false)}
         players={roster.players}
         onSelectPlayer={playerSession.selectPlayer}
-        signIn={admin.signIn}
+        onCreatePlayer={roster.create}
       />
     </div>
   )
