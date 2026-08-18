@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import type { Match, MatchDraft, Player, Slot, TeamId } from '../../types'
+import type { Match, MatchDraft, MvpVote, Player, Slot, TeamId } from '../../types'
 import { isLocked } from '../../types'
 import { DEFAULT_FORMATION, buildSlots, getFormation } from '../../data/formations'
 import { matchStore } from '../../lib/matchStore'
@@ -23,6 +23,7 @@ const EMPTY_SLOTS: SlotsByTeam = { A: [], B: [] }
 export function useMatches(groupId: string, byId: Map<string, Player>) {
   const [matches, setMatches] = useState<Match[]>([])
   const [slotsByMatch, setSlotsByMatch] = useState<Map<string, SlotsByTeam>>(new Map())
+  const [mvpVotesByMatch, setMvpVotesByMatch] = useState<Map<string, MvpVote[]>>(new Map())
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -34,12 +35,14 @@ export function useMatches(groupId: string, byId: Map<string, Player>) {
   const reload = useCallback(async () => {
     try {
       const list = await matchStore.list(groupId)
-      const loaded = await matchStore.loadAllSlots(
-        groupId,
-        list.map((m) => m.id),
-      )
+      const matchIds = list.map((m) => m.id)
+      const [loaded, votes] = await Promise.all([
+        matchStore.loadAllSlots(groupId, matchIds),
+        matchStore.listMvpVotes(groupId, matchIds),
+      ])
       setMatches(list)
       setSlotsByMatch(loaded)
+      setMvpVotesByMatch(votes)
       setError(null)
     } catch (e) {
       setError(errorMessage(e, 'No se pudo cargar la fecha'))
@@ -69,8 +72,9 @@ export function useMatches(groupId: string, byId: Map<string, Player>) {
     () =>
       computePlayerStats(
         matches.map((m) => ({ match: m, slots: slotsByMatch.get(m.id) ?? EMPTY_SLOTS })),
+        mvpVotesByMatch,
       ),
-    [matches, slotsByMatch],
+    [matches, slotsByMatch, mvpVotesByMatch],
   )
 
   /** Optimistic local update, persisted in the background; a failure surfaces as an error
@@ -215,6 +219,20 @@ export function useMatches(groupId: string, byId: Map<string, Player>) {
     [groupId],
   )
 
+  /** A vote is final once cast — a rejected duplicate just surfaces as an error, same
+      as every other mutation here. */
+  const voteMvp = useCallback(
+    async (matchId: string, voterPlayerId: string, votedPlayerId: string) => {
+      const vote = await matchStore.castMvpVote(groupId, matchId, voterPlayerId, votedPlayerId)
+      setMvpVotesByMatch((prev) => {
+        const map = new Map(prev)
+        map.set(matchId, [...(map.get(matchId) ?? []), vote])
+        return map
+      })
+    },
+    [groupId],
+  )
+
   return {
     matches,
     currentMatch,
@@ -223,6 +241,7 @@ export function useMatches(groupId: string, byId: Map<string, Player>) {
     error,
     slots,
     slotsByMatch,
+    mvpVotesByMatch,
     stats,
     selectedId,
     assignedIds,
@@ -235,6 +254,7 @@ export function useMatches(groupId: string, byId: Map<string, Player>) {
     clearTeam,
     createMatch,
     setResult,
+    voteMvp,
     clearSelection: () => setSelectedId(null),
   }
 }

@@ -93,6 +93,23 @@ export function isLocked(match: Match, now: Date = new Date()): boolean {
   return new Date(match.scheduledAt).getTime() <= now.getTime()
 }
 
+const RESULT_UNLOCK_MS = 60 * 60 * 1000
+
+/** Resultado entry and MVP voting both open together, an hour after kickoff — enough
+    time for the match to actually finish. */
+export function canEnterResult(match: Match, now: Date = new Date()): boolean {
+  return new Date(match.scheduledAt).getTime() + RESULT_UNLOCK_MS <= now.getTime()
+}
+
+/** One player's MVP pick for one match. Final once cast — the DB has no update/delete
+    policy for this table, so there's no "changed my vote" path anywhere. */
+export type MvpVote = {
+  matchId: string
+  voterPlayerId: string
+  votedPlayerId: string
+  createdAt: string
+}
+
 export function hasResult(match: Match): boolean {
   return match.scoreA !== null && match.scoreB !== null
 }

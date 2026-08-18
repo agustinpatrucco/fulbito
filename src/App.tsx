@@ -110,10 +110,23 @@ function GroupApp({ group }: { group: Group }) {
         </div>
       </header>
 
-      {tab === 'partido' && <PitchPage roster={roster} matches={matches} canEdit={canEdit} />}
+      {tab === 'partido' && (
+        <PitchPage
+          roster={roster}
+          matches={matches}
+          canEdit={canEdit}
+          sessionPlayerId={sessionPlayer?.id ?? null}
+        />
+      )}
 
       {tab === 'historial' && (
-        <HistorialPage roster={roster} matches={matches} canEdit={canEdit} isAdmin={isAdmin} />
+        <HistorialPage
+          roster={roster}
+          matches={matches}
+          canEdit={canEdit}
+          isAdmin={isAdmin}
+          sessionPlayerId={sessionPlayer?.id ?? null}
+        />
       )}
 
       {tab === 'plantel' && (

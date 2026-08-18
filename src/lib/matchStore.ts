@@ -1,4 +1,4 @@
-import type { Match, MatchDraft, Slot, TeamId } from '../types'
+import type { Match, MatchDraft, MvpVote, Slot, TeamId } from '../types'
 import { supabase, isCloudMode } from './supabase'
 
 /**
@@ -21,6 +21,15 @@ export type MatchStore = {
       stats need, versus the single `loadSlots` the pitch uses for just the current one. */
   loadAllSlots(groupId: string, matchIds: string[]): Promise<Map<string, { A: Slot[]; B: Slot[] }>>
   setResult(groupId: string, matchId: string, scoreA: number, scoreB: number): Promise<Match>
+  /** One query for every match's MVP votes at once — same shape as `loadAllSlots`. */
+  listMvpVotes(groupId: string, matchIds: string[]): Promise<Map<string, MvpVote[]>>
+  /** Throws if this player already voted in this match — a vote is final. */
+  castMvpVote(
+    groupId: string,
+    matchId: string,
+    voterPlayerId: string,
+    votedPlayerId: string,
+  ): Promise<MvpVote>
 }
 
 // --- row mapping --------------------------------------------------------------
@@ -67,6 +76,22 @@ function slotsFromRows(rows: SlotRow[]): Slot[] {
       position: r.position as Slot['position'],
       playerId: r.player_id,
     }))
+}
+
+type MvpVoteRow = {
+  match_id: string
+  voter_player_id: string
+  voted_player_id: string
+  created_at: string
+}
+
+function voteFromRow(row: MvpVoteRow): MvpVote {
+  return {
+    matchId: row.match_id,
+    voterPlayerId: row.voter_player_id,
+    votedPlayerId: row.voted_player_id,
+    createdAt: row.created_at,
+  }
 }
 
 // --- cloud ----------------------------------------------------------------------
@@ -154,12 +179,38 @@ const cloudStore: MatchStore = {
     if (error) throw error
     return fromRow(data as MatchRow)
   },
+
+  async listMvpVotes(_groupId, matchIds) {
+    const result = new Map<string, MvpVote[]>()
+    if (matchIds.length === 0) return result
+    for (const id of matchIds) result.set(id, [])
+    const { data, error } = await supabase!
+      .from('match_mvp_votes')
+      .select('*')
+      .in('match_id', matchIds)
+    if (error) throw error
+    for (const row of data as MvpVoteRow[]) {
+      result.get(row.match_id)?.push(voteFromRow(row))
+    }
+    return result
+  },
+
+  async castMvpVote(_groupId, matchId, voterPlayerId, votedPlayerId) {
+    const { data, error } = await supabase!
+      .from('match_mvp_votes')
+      .insert({ match_id: matchId, voter_player_id: voterPlayerId, voted_player_id: votedPlayerId })
+      .select()
+      .single()
+    if (error) throw error
+    return voteFromRow(data as MvpVoteRow)
+  },
 }
 
 // --- local ------------------------------------------------------------------------
 
 const matchesKey = (groupId: string) => `fulbito.${groupId}.matches.v1`
 const slotsKey = (groupId: string) => `fulbito.${groupId}.match_slots.v1`
+const votesKey = (groupId: string) => `fulbito.${groupId}.mvp_votes.v1`
 
 type LocalSlots = Record<string, { A: Slot[]; B: Slot[] }>
 
@@ -187,6 +238,19 @@ function readAllSlots(groupId: string): LocalSlots {
 
 function writeAllSlots(groupId: string, slots: LocalSlots) {
   localStorage.setItem(slotsKey(groupId), JSON.stringify(slots))
+}
+
+function readVotes(groupId: string): MvpVote[] {
+  try {
+    const raw = localStorage.getItem(votesKey(groupId))
+    return raw ? (JSON.parse(raw) as MvpVote[]) : []
+  } catch {
+    return []
+  }
+}
+
+function writeVotes(groupId: string, votes: MvpVote[]) {
+  localStorage.setItem(votesKey(groupId), JSON.stringify(votes))
 }
 
 const localStore: MatchStore = {
@@ -246,6 +310,31 @@ const localStore: MatchStore = {
     matches[index] = { ...matches[index], scoreA, scoreB }
     writeMatches(groupId, matches)
     return matches[index]
+  },
+
+  async listMvpVotes(groupId, matchIds) {
+    const votes = readVotes(groupId)
+    const result = new Map<string, MvpVote[]>()
+    for (const id of matchIds) result.set(id, [])
+    for (const vote of votes) {
+      if (result.has(vote.matchId)) result.get(vote.matchId)!.push(vote)
+    }
+    return result
+  },
+
+  async castMvpVote(groupId, matchId, voterPlayerId, votedPlayerId) {
+    const votes = readVotes(groupId)
+    if (votes.some((v) => v.matchId === matchId && v.voterPlayerId === voterPlayerId)) {
+      throw new Error('Ya votaste en este partido')
+    }
+    const vote: MvpVote = {
+      matchId,
+      voterPlayerId,
+      votedPlayerId,
+      createdAt: new Date().toISOString(),
+    }
+    writeVotes(groupId, [...votes, vote])
+    return vote
   },
 }
 
