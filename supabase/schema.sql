@@ -162,6 +162,29 @@ drop policy if exists "match slots are writable by anyone with the link" on publ
 create policy "match slots are writable by anyone with the link"
   on public.match_slots for all using (true) with check (true);
 
+-- mvp votes ---------------------------------------------------------------------
+--
+-- One vote per player per match, cast an hour after kickoff. Final once cast — no
+-- update/delete policy below, so there's no way to change a vote after the fact.
+
+create table if not exists public.match_mvp_votes (
+  match_id         uuid not null references public.matches (id) on delete cascade,
+  voter_player_id  uuid not null references public.players (id) on delete cascade,
+  voted_player_id  uuid not null references public.players (id) on delete cascade,
+  created_at       timestamptz not null default now(),
+  primary key (match_id, voter_player_id)
+);
+
+alter table public.match_mvp_votes enable row level security;
+
+drop policy if exists "mvp votes are readable by everyone" on public.match_mvp_votes;
+create policy "mvp votes are readable by everyone"
+  on public.match_mvp_votes for select using (true);
+
+drop policy if exists "mvp votes are insertable by anyone with the link" on public.match_mvp_votes;
+create policy "mvp votes are insertable by anyone with the link"
+  on public.match_mvp_votes for insert with check (true);
+
 -- photo storage ---------------------------------------------------------------
 
 insert into storage.buckets (id, name, public)

@@ -1,13 +1,13 @@
 import { useMemo, useState } from 'react'
-import type { Match, Player, Slot, TeamId } from '../../types'
-import { displayName, hasResult, isLocked, winnerOf } from '../../types'
+import type { Match, MvpVote as MvpVoteType, Player, Slot, TeamId } from '../../types'
+import { canEnterResult, displayName, hasResult, isLocked, winnerOf } from '../../types'
 import { Button } from '../../components/ui'
 import { Modal } from '../../components/Modal'
 import { ImportModal } from '../import/ImportModal'
 import { formatFecha } from './format'
 import { NewFechaForm } from './NewFechaForm'
 import { ResultForm } from './ResultForm'
-import { MIN_STREAK_TO_SHOW } from './stats'
+import { MvpVote } from './MvpVote'
 import type { useMatches } from './useMatches'
 import type { usePlayers } from '../players/usePlayers'
 
@@ -20,11 +20,22 @@ type Props = {
   /** Backfilling old partidos stays admin-only — everything else here is open to any
       logged-in player. */
   isAdmin: boolean
+  sessionPlayerId: string | null
 }
 
-export function HistorialPage({ roster, matches, canEdit, isAdmin }: Props) {
+export function HistorialPage({ roster, matches, canEdit, isAdmin, sessionPlayerId }: Props) {
   const { byId } = roster
-  const { matches: list, slotsByMatch, stats, loading, setResult, fillMatchTeam } = matches
+  const {
+    matches: list,
+    slotsByMatch,
+    mvpVotesByMatch,
+    stats,
+    loading,
+    setResult,
+    fillMatchTeam,
+    voteMvp,
+  } = matches
+  const lastMatchId = list[0]?.id ?? null
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [addingPast, setAddingPast] = useState(false)
   /** The match a "Pegar lista" is currently targeting — set right after creating a past
@@ -64,7 +75,7 @@ export function HistorialPage({ roster, matches, canEdit, isAdmin }: Props) {
                   <th className="px-2 py-2 text-center font-semibold">Victorias</th>
                   <th className="px-2 py-2 text-center font-semibold">Quintana</th>
                   <th className="px-2 py-2 text-center font-semibold">Complejo</th>
-                  <th className="px-2 py-2 text-center font-semibold">Racha</th>
+                  <th className="px-2 py-2 text-center font-semibold">MVP</th>
                 </tr>
               </thead>
               <tbody>
@@ -81,8 +92,8 @@ export function HistorialPage({ roster, matches, canEdit, isAdmin }: Props) {
                       {r.winsByCancha.Complejo}
                     </td>
                     <td className="px-2 py-2 text-center">
-                      {r.streak >= MIN_STREAK_TO_SHOW ? (
-                        <span className="text-orange-300">🔥{r.streak}</span>
+                      {r.mvpCount > 0 ? (
+                        <span className="text-amber-300">🏆{r.mvpCount}</span>
                       ) : (
                         <span className="text-white/20">—</span>
                       )}
@@ -122,6 +133,10 @@ export function HistorialPage({ roster, matches, canEdit, isAdmin }: Props) {
               }
               onSaveResult={(a, b) => setResult(match.id, a, b)}
               onImportLineup={() => setImportingFor(match)}
+              isLastMatch={match.id === lastMatchId}
+              sessionPlayerId={sessionPlayerId}
+              votes={mvpVotesByMatch.get(match.id) ?? []}
+              onVoteMvp={(votedPlayerId) => voteMvp(match.id, sessionPlayerId!, votedPlayerId)}
             />
           ))}
         </ul>
@@ -163,6 +178,10 @@ function MatchRow({
   onToggle,
   onSaveResult,
   onImportLineup,
+  isLastMatch,
+  sessionPlayerId,
+  votes,
+  onVoteMvp,
 }: {
   match: Match
   slots: { A: Slot[]; B: Slot[] }
@@ -172,6 +191,11 @@ function MatchRow({
   onToggle: () => void
   onSaveResult: (scoreA: number, scoreB: number) => Promise<void>
   onImportLineup: () => void
+  /** MVP voting only applies to the most recent Partido, never older history. */
+  isLastMatch: boolean
+  sessionPlayerId: string | null
+  votes: MvpVoteType[]
+  onVoteMvp: (votedPlayerId: string) => Promise<void>
 }) {
   const locked = isLocked(match)
   const winner = winnerOf(match)
@@ -226,6 +250,19 @@ function MatchRow({
             <div className="mt-4 space-y-3 border-t border-white/10 pt-3">
               <Button onClick={onImportLineup}>Pegar lista</Button>
               <ResultForm match={match} onSave={onSaveResult} />
+            </div>
+          )}
+
+          {isLastMatch && canEnterResult(match) && (
+            <div className="mt-4 border-t border-white/10 pt-3">
+              <MvpVote
+                match={match}
+                slots={slots}
+                byId={byId}
+                sessionPlayerId={sessionPlayerId}
+                votes={votes}
+                onVote={onVoteMvp}
+              />
             </div>
           )}
         </div>

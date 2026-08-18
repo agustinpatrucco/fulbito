@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { Cancha, Match, Slot } from '../../types'
+import type { Cancha, Match, MvpVote, Slot } from '../../types'
 import { computePlayerStats, MIN_STREAK_TO_SHOW, statsFor, type MatchWithSlots } from './stats'
 
 let seq = 0
@@ -120,11 +120,44 @@ describe('computePlayerStats', () => {
       wins: 0,
       winsByCancha: { Quintana: 0, Complejo: 0 },
       streak: 0,
+      mvpCount: 0,
     })
   })
 
   it('handles an empty match list', () => {
     expect(computePlayerStats([]).size).toBe(0)
+  })
+})
+
+describe('computePlayerStats MVP tally', () => {
+  function vote(matchId: string, voterPlayerId: string, votedPlayerId: string): MvpVote {
+    return { matchId, voterPlayerId, votedPlayerId, createdAt: '2026-01-01T00:00:00.000Z' }
+  }
+
+  it('awards MVP to whoever got the most votes', () => {
+    const entry = scoredMatch(['agus'], ['nico'])
+    const votesByMatch = new Map<string, MvpVote[]>([
+      [entry.match.id, [vote(entry.match.id, 'agus', 'nico'), vote(entry.match.id, 'nico', 'nico')]],
+    ])
+    const stats = computePlayerStats([entry], votesByMatch)
+    expect(statsFor(stats, 'nico').mvpCount).toBe(1)
+    expect(statsFor(stats, 'agus').mvpCount).toBe(0)
+  })
+
+  it('awards MVP to everyone tied for the top vote count', () => {
+    const entry = scoredMatch(['agus'], ['nico'])
+    const votesByMatch = new Map<string, MvpVote[]>([
+      [entry.match.id, [vote(entry.match.id, 'agus', 'nico'), vote(entry.match.id, 'nico', 'agus')]],
+    ])
+    const stats = computePlayerStats([entry], votesByMatch)
+    expect(statsFor(stats, 'agus').mvpCount).toBe(1)
+    expect(statsFor(stats, 'nico').mvpCount).toBe(1)
+  })
+
+  it('leaves mvpCount at 0 when nobody voted', () => {
+    const entry = scoredMatch(['agus'], ['nico'])
+    const stats = computePlayerStats([entry], new Map([[entry.match.id, []]]))
+    expect(statsFor(stats, 'agus').mvpCount).toBe(0)
   })
 })
 

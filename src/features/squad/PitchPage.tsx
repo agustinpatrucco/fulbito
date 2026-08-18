@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import type { TeamId } from '../../types'
-import { hasResult } from '../../types'
+import { canEnterResult, hasResult, isLocked } from '../../types'
 import { getFormation } from '../../data/formations'
 import { Button } from '../../components/ui'
 import { Modal } from '../../components/Modal'
@@ -9,6 +9,7 @@ import { TeamPitch } from './TeamPitch'
 import { ImportModal } from '../import/ImportModal'
 import { NewFechaForm } from '../matches/NewFechaForm'
 import { ResultForm } from '../matches/ResultForm'
+import { MvpVote } from '../matches/MvpVote'
 import { formatFecha } from '../matches/format'
 import type { usePlayers } from '../players/usePlayers'
 import type { useMatches } from '../matches/useMatches'
@@ -19,11 +20,13 @@ type Props = {
   roster: ReturnType<typeof usePlayers>
   matches: ReturnType<typeof useMatches>
   canEdit: boolean
+  sessionPlayerId: string | null
 }
 
-export function PitchPage({ roster, matches, canEdit }: Props) {
+export function PitchPage({ roster, matches, canEdit, sessionPlayerId }: Props) {
   const { players, byId } = roster
-  const { currentMatch, locked, loading, slots, stats, selectedId, assignedIds } = matches
+  const { currentMatch, loading, slots, mvpVotesByMatch, stats, selectedId, assignedIds } =
+    matches
   const [importing, setImporting] = useState(false)
   const [creatingFecha, setCreatingFecha] = useState(false)
 
@@ -38,30 +41,13 @@ export function PitchPage({ roster, matches, canEdit }: Props) {
     return <p className="flex-1 py-16 text-center text-white/40">Cargando…</p>
   }
 
-  // No fecha yet, or the current one's kickoff has passed: the pitch here shows what's
-  // next, not what already happened — a played match lives in Historial instead.
-  if (!currentMatch || locked) {
+  // No fecha at all yet — nothing to show but the "create one" flow. Once a fecha
+  // exists, the squads stay visible here even after kickoff (read-only); only player
+  // swapping gets blocked, further down.
+  if (!currentMatch) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-4 px-4 text-center">
-        {currentMatch ? (
-          <div className="max-w-sm text-sm text-white/50">
-            <p>
-              La fecha del {formatFecha(currentMatch.scheduledAt)} en {currentMatch.cancha} ya
-              se jugó y quedó bloqueada. Podés ver la formación en Historial.
-            </p>
-            {!hasResult(currentMatch) && canEdit && (
-              <div className="mt-3 flex justify-center">
-                <ResultForm
-                  match={currentMatch}
-                  compact
-                  onSave={(a, b) => matches.setResult(currentMatch.id, a, b)}
-                />
-              </div>
-            )}
-          </div>
-        ) : (
-          <p className="text-white/40">Todavía no hay ninguna fecha creada.</p>
-        )}
+        <p className="text-white/40">Todavía no hay ninguna fecha creada.</p>
 
         {canEdit ? (
           <Button variant="primary" onClick={() => setCreatingFecha(true)}>
@@ -78,6 +64,9 @@ export function PitchPage({ roster, matches, canEdit }: Props) {
     )
   }
 
+  const swapLocked = isLocked(currentMatch)
+  const resultOpen = canEnterResult(currentMatch)
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex-1 overflow-y-auto">
@@ -90,7 +79,17 @@ export function PitchPage({ roster, matches, canEdit }: Props) {
               </p>
             </div>
 
-            {canEdit && (
+            {resultOpen && !hasResult(currentMatch) && canEdit && (
+              <div className="mx-auto">
+                <ResultForm
+                  match={currentMatch}
+                  minimal
+                  onSave={(a, b) => matches.setResult(currentMatch.id, a, b)}
+                />
+              </div>
+            )}
+
+            {canEdit && !swapLocked && (
               <Button className="ml-auto" onClick={() => setImporting(true)}>
                 Pegar lista
               </Button>
@@ -116,7 +115,7 @@ export function PitchPage({ roster, matches, canEdit }: Props) {
                   selectedId={selectedId}
                   size={currentMatch.teamSize}
                   streaks={streaks}
-                  locked={!canEdit}
+                  locked={swapLocked || !canEdit}
                   onSlotTap={(index) => matches.tapSlot(team, index)}
                   onPlayerTap={matches.tapPlayer}
                   onFormationChange={(id) => matches.setFormation(team, id)}
@@ -125,10 +124,25 @@ export function PitchPage({ roster, matches, canEdit }: Props) {
               ))}
             </div>
           )}
+
+          {resultOpen && (
+            <div className="mt-5 border-t border-white/10 pt-4">
+              <MvpVote
+                match={currentMatch}
+                slots={slots}
+                byId={byId}
+                sessionPlayerId={sessionPlayerId}
+                votes={mvpVotesByMatch.get(currentMatch.id) ?? []}
+                onVote={(votedPlayerId) =>
+                  matches.voteMvp(currentMatch.id, sessionPlayerId!, votedPlayerId)
+                }
+              />
+            </div>
+          )}
         </div>
       </div>
 
-      {canEdit && (
+      {canEdit && !swapLocked && (
         <Bench
           players={bench}
           selectedId={selectedId}

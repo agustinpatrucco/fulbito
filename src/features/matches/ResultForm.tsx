@@ -7,9 +7,13 @@ type Props = {
   match: Match
   onSave: (scoreA: number, scoreB: number) => Promise<void>
   compact?: boolean
+  /** Same single-row layout as compact, but drops the "Equipo 1"/"Equipo 2" labels too —
+      just the two boxes and the save button. For spots where the teams are already
+      labeled right below (the Partido header). */
+  minimal?: boolean
 }
 
-export function ResultForm({ match, onSave, compact = false }: Props) {
+export function ResultForm({ match, onSave, compact = false, minimal = false }: Props) {
   const [scoreA, setScoreA] = useState(match.scoreA !== null ? String(match.scoreA) : '')
   const [scoreB, setScoreB] = useState(match.scoreB !== null ? String(match.scoreB) : '')
   const [busy, setBusy] = useState(false)
@@ -34,14 +38,17 @@ export function ResultForm({ match, onSave, compact = false }: Props) {
   }
 
   return (
-    <form onSubmit={submit} className={compact ? 'flex items-center gap-2' : 'space-y-3'}>
-      {!compact && (
+    <form
+      onSubmit={submit}
+      className={compact || minimal ? 'flex items-center gap-2' : 'space-y-3'}
+    >
+      {!compact && !minimal && (
         <p className="text-xs font-semibold uppercase tracking-wide text-white/50">
           Resultado final
         </p>
       )}
       <div className="flex items-center gap-2">
-        <span className="text-sm text-white/60">Equipo 1</span>
+        {!minimal && <span className="text-sm text-white/60">Equipo 1</span>}
         <input
           type="number"
           min={0}
@@ -59,7 +66,7 @@ export function ResultForm({ match, onSave, compact = false }: Props) {
           onChange={(e) => setScoreB(e.target.value)}
           className="w-14 rounded-lg border border-white/10 bg-black/30 px-2 py-1.5 text-center text-sm outline-none focus:border-emerald-400/60"
         />
-        <span className="text-sm text-white/60">Equipo 2</span>
+        {!minimal && <span className="text-sm text-white/60">Equipo 2</span>}
       </div>
       <Button type="submit" variant="primary" disabled={busy}>
         {busy ? 'Guardando…' : match.scoreA !== null ? 'Corregir' : 'Guardar'}
