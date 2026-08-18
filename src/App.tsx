@@ -48,7 +48,7 @@ function GroupApp({ group }: { group: Group }) {
   const canEdit = sessionPlayer !== null
 
   // Nobody's picked a player yet on this device — surface the gate right away instead
-  // of waiting for someone to notice the "Editar" button.
+  // of waiting for someone to notice the "Iniciar sesión" button.
   useEffect(() => {
     if (!roster.loading && !sessionPlayer) setGateOpen(true)
   }, [roster.loading, sessionPlayer])
@@ -105,7 +105,7 @@ function GroupApp({ group }: { group: Group }) {
             onClick={() => (canEdit ? playerSession.clearSession() : setGateOpen(true))}
             className="rounded-lg border border-white/10 px-2.5 py-1.5 text-xs text-white/60 hover:text-white"
           >
-            {canEdit ? 'Salir' : 'Editar'}
+            {canEdit ? 'Salir' : 'Iniciar sesión'}
           </button>
         </div>
       </header>
