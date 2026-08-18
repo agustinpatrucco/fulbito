@@ -1,7 +1,9 @@
 import { useMemo, useState } from 'react'
 import { useAuth } from './lib/auth'
+import { usePlayerSession } from './lib/playerSession'
 import { isCloudMode } from './lib/supabase'
-import { PasswordGate } from './components/PasswordGate'
+import { SessionGate } from './components/SessionGate'
+import { displayName } from './types'
 import { usePlayers } from './features/players/usePlayers'
 import { RosterPage } from './features/players/RosterPage'
 import { PitchPage } from './features/squad/PitchPage'
@@ -19,9 +21,19 @@ const TAB_LABELS: Record<Tab, string> = {
 export default function App() {
   const [tab, setTab] = useState<Tab>('partido')
   const [gateOpen, setGateOpen] = useState(false)
-  const { canEdit, ready, signIn, signOut } = useAuth()
+  const admin = useAuth()
   const roster = usePlayers()
+  const playerSession = usePlayerSession(roster.players)
   const matches = useMatches(roster.byId)
+
+  const isAdmin = admin.canEdit
+  const sessionPlayer = isAdmin ? null : playerSession.player
+  const canEdit = isAdmin || sessionPlayer !== null
+
+  function signOut() {
+    admin.signOut()
+    playerSession.clearSession()
+  }
 
   const streaks = useMemo(
     () => new Map([...matches.stats].map(([id, s]) => [id, s.streak])),
@@ -59,14 +71,21 @@ export default function App() {
               MODO LOCAL
             </span>
           )}
-          {isCloudMode && ready && (
-            <button
-              type="button"
-              onClick={() => (canEdit ? signOut() : setGateOpen(true))}
-              className="rounded-lg border border-white/10 px-2.5 py-1.5 text-xs text-white/60 hover:text-white"
-            >
-              {canEdit ? 'Salir' : 'Editar'}
-            </button>
+          {isCloudMode && admin.ready && (
+            <>
+              {canEdit && (
+                <span className="hidden text-xs text-white/50 sm:block">
+                  {isAdmin ? 'Admin' : displayName(sessionPlayer!)}
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={() => (canEdit ? signOut() : setGateOpen(true))}
+                className="rounded-lg border border-white/10 px-2.5 py-1.5 text-xs text-white/60 hover:text-white"
+              >
+                {canEdit ? 'Salir' : 'Editar'}
+              </button>
+            </>
           )}
         </div>
       </header>
@@ -74,16 +93,27 @@ export default function App() {
       {tab === 'partido' && <PitchPage roster={roster} matches={matches} canEdit={canEdit} />}
 
       {tab === 'historial' && (
-        <HistorialPage roster={roster} matches={matches} canEdit={canEdit} />
+        <HistorialPage roster={roster} matches={matches} canEdit={canEdit} isAdmin={isAdmin} />
       )}
 
       {tab === 'plantel' && (
         <div className="flex-1 overflow-y-auto">
-          <RosterPage roster={roster} canEdit={canEdit} streaks={streaks} />
+          <RosterPage
+            roster={roster}
+            isAdmin={isAdmin}
+            sessionPlayerId={sessionPlayer?.id ?? null}
+            streaks={streaks}
+          />
         </div>
       )}
 
-      <PasswordGate open={gateOpen} onClose={() => setGateOpen(false)} signIn={signIn} />
+      <SessionGate
+        open={gateOpen}
+        onClose={() => setGateOpen(false)}
+        players={roster.players}
+        onSelectPlayer={playerSession.selectPlayer}
+        signIn={admin.signIn}
+      />
     </div>
   )
 }

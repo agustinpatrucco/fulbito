@@ -77,17 +77,27 @@ Las fechas (`matches`) cambiaron de forma — ahora llevan hora, cancha y result
 de solo una fecha del día. Si tu proyecto de Supabase ya tenía la tabla vieja (nunca se
 llegó a usar, así que no hay datos que perder), corré una vez
 [`supabase/migrations/0002_fecha_result.sql`](supabase/migrations/0002_fecha_result.sql)
-en el SQL Editor. Un proyecto nuevo no necesita esto — alcanza con `schema.sql`.
+en el SQL Editor. Después corré también
+[`supabase/migrations/0003_open_writes.sql`](supabase/migrations/0003_open_writes.sql)
+(ver más abajo por qué). Un proyecto nuevo no necesita ninguno de los dos — alcanza con
+`schema.sql`.
 
 ### Sobre la seguridad
 
-Cualquiera con el link puede **ver** el plantel; solo quien tenga la contraseña puede
-**modificarlo**. Eso lo garantiza Row Level Security del lado del servidor, no el
-navegador: aunque alguien abra la consola, sin el token de Supabase los `insert` y
-`delete` fallan.
+Cualquiera con el link puede **ver y modificar** el plantel, las fechas y los
+resultados — eso lo permite Row Level Security del lado del servidor, no algo que haga
+el navegador. No hay una cuenta por persona: alguien "inicia sesión" simplemente
+eligiendo su propio nombre en Plantel, sin contraseña, así que no hay ningún token de
+Supabase distinto por persona contra el cual chequear un `insert` o un `delete`.
 
-Por eso la `anon key` puede ir en el bundle sin problema — está pensada para ser pública.
-Lo que **nunca** hay que publicar es la `service_role key`.
+Lo único que sigue detrás de la contraseña compartida (la cuenta de Supabase Auth de
+más arriba) son las acciones de **admin**: crear o eliminar jugadores, y agregar
+partidos anteriores al historial. Esa contraseña sigue siendo válida — Supabase la
+verifica igual que antes — pero ahora es un permiso extra dentro de la app, no la
+puerta de entrada para poder editar en general.
+
+Por eso la `anon key` puede ir en el bundle sin problema — está pensada para ser
+pública. Lo que **nunca** hay que publicar es la `service_role key`.
 
 ---
 
@@ -142,6 +152,22 @@ crear en el momento con **Crear**.
 
 ---
 
+## Iniciar sesión
+
+Con **Editar**, arriba a la derecha, hay dos caminos:
+
+- **Elegir tu jugador**: tocás tu propia carta en la lista y listo, sin contraseña. Desde
+  ahí podés editar tu carta, crear fechas, armar los equipos (tocando o pegando la
+  lista) y cargar resultados — todo menos crear/eliminar jugadores y agregar partidos
+  anteriores al historial.
+- **¿Sos admin?**: la contraseña compartida de siempre. Suma esas dos acciones que le
+  faltan al modo jugador, y además deja editar la carta de cualquiera, no solo la
+  propia.
+
+La sesión (la tuya o la de admin) queda guardada en el dispositivo, como antes.
+
+---
+
 ## Fechas, historial y racha
 
 **Crear una fecha** desde la pestaña Partido: día, hora, cancha (Quintana o Complejo) y
@@ -153,7 +179,7 @@ una fecha "activa" a la vez: la de horario más lejano en el tiempo.
 
 En cualquier fecha, la hora solo admite minutos **00, 15, 30 o 45**.
 
-**Agregar un partido anterior** (solo con sesión iniciada) desde Historial, con
+**Agregar un partido anterior** (solo admin) desde Historial, con
 **+ Agregar partido anterior** — para cargar partidos jugados antes de usar la app. Pide
 lo mismo que crear una fecha, pero al revés: la fecha tiene que ser de hoy o antes. Al
 crearlo se abre directamente **Pegar lista** para cargar las alineaciones, y después
@@ -198,11 +224,13 @@ src/
   lib/supabase.ts             cliente (null = modo local)
   lib/store.ts                CRUD de jugadores, backend intercambiable
   lib/matchStore.ts           CRUD de fechas y alineaciones, backend intercambiable
-  lib/auth.ts                 login con la contraseña compartida
+  lib/auth.ts                 login de admin con la contraseña compartida
+  lib/playerSession.ts        login como jugador (elegís tu carta, sin contraseña)
   features/players/           carta, formulario, plantel, subida de fotos
   features/squad/             cancha, banco, tap-to-assign
   features/matches/           fecha, bloqueo, resultado, historial, racha (con tests)
   features/import/            parser + matcher de la lista pegada (con tests)
 supabase/schema.sql                          tablas, RLS y bucket de fotos (proyecto nuevo)
 supabase/migrations/0002_fecha_result.sql     al día la tabla matches (proyecto existente)
+supabase/migrations/0003_open_writes.sql      abre los writes a cualquiera con el link
 ```

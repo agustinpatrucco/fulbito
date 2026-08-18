@@ -17,9 +17,12 @@ type Props = {
   roster: ReturnType<typeof usePlayers>
   matches: ReturnType<typeof useMatches>
   canEdit: boolean
+  /** Backfilling old partidos stays admin-only — everything else here is open to any
+      logged-in player. */
+  isAdmin: boolean
 }
 
-export function HistorialPage({ roster, matches, canEdit }: Props) {
+export function HistorialPage({ roster, matches, canEdit, isAdmin }: Props) {
   const { byId } = roster
   const { matches: list, slotsByMatch, stats, loading, setResult, fillMatchTeam } = matches
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
@@ -42,7 +45,7 @@ export function HistorialPage({ roster, matches, canEdit }: Props) {
 
   return (
     <div className="mx-auto w-full max-w-3xl flex-1 overflow-y-auto px-4 py-4">
-      {canEdit && (
+      {isAdmin && (
         <div className="mb-4 flex justify-end">
           <Button onClick={() => setAddingPast(true)}>+ Agregar partido anterior</Button>
         </div>
