@@ -1,8 +1,11 @@
 -- Fulbito schema. Paste this whole file into the Supabase SQL editor and run it once.
 --
--- Security model: anyone with the URL can READ the roster; only the single logged-in
--- account can WRITE. That is enforced here by Row Level Security, not by the client.
--- The anon key shipped in the browser bundle is harmless precisely because of this.
+-- Security model: anyone with the URL can READ and WRITE. There's no per-row auth —
+-- a friend "logs in" by picking their own name from Plantel, no password involved, so
+-- there's no server-side identity to check writes against. The one real Supabase Auth
+-- account (see README) still exists and still gates admin-only actions in the client
+-- (creating/deleting players, backfilling old partidos), but that's a client-side flag,
+-- not something Row Level Security enforces below.
 
 create extension if not exists "pgcrypto";
 
@@ -34,9 +37,9 @@ create policy "players are readable by everyone"
   using (true);
 
 drop policy if exists "players are writable when signed in" on public.players;
-create policy "players are writable when signed in"
+drop policy if exists "players are writable by anyone with the link" on public.players;
+create policy "players are writable by anyone with the link"
   on public.players for all
-  to authenticated
   using (true)
   with check (true);
 
@@ -77,16 +80,18 @@ create policy "matches are readable by everyone"
   on public.matches for select using (true);
 
 drop policy if exists "matches are writable when signed in" on public.matches;
-create policy "matches are writable when signed in"
-  on public.matches for all to authenticated using (true) with check (true);
+drop policy if exists "matches are writable by anyone with the link" on public.matches;
+create policy "matches are writable by anyone with the link"
+  on public.matches for all using (true) with check (true);
 
 drop policy if exists "match slots are readable by everyone" on public.match_slots;
 create policy "match slots are readable by everyone"
   on public.match_slots for select using (true);
 
 drop policy if exists "match slots are writable when signed in" on public.match_slots;
-create policy "match slots are writable when signed in"
-  on public.match_slots for all to authenticated using (true) with check (true);
+drop policy if exists "match slots are writable by anyone with the link" on public.match_slots;
+create policy "match slots are writable by anyone with the link"
+  on public.match_slots for all using (true) with check (true);
 
 -- photo storage ---------------------------------------------------------------
 
@@ -100,8 +105,8 @@ create policy "player photos are readable by everyone"
   using (bucket_id = 'player-photos');
 
 drop policy if exists "player photos are writable when signed in" on storage.objects;
-create policy "player photos are writable when signed in"
+drop policy if exists "player photos are writable by anyone with the link" on storage.objects;
+create policy "player photos are writable by anyone with the link"
   on storage.objects for all
-  to authenticated
   using (bucket_id = 'player-photos')
   with check (bucket_id = 'player-photos');

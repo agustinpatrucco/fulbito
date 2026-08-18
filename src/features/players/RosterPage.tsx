@@ -9,11 +9,14 @@ import type { usePlayers } from './usePlayers'
 
 type Props = {
   roster: ReturnType<typeof usePlayers>
-  canEdit: boolean
+  /** Full access: create/delete anyone, edit any card. */
+  isAdmin: boolean
+  /** A player-session user may edit only this one card. */
+  sessionPlayerId: string | null
   streaks?: Map<string, number>
 }
 
-export function RosterPage({ roster, canEdit, streaks }: Props) {
+export function RosterPage({ roster, isAdmin, sessionPlayerId, streaks }: Props) {
   const { players, loading, error, create, update, remove } = roster
   const [query, setQuery] = useState('')
   const [editing, setEditing] = useState<Player | null>(null)
@@ -35,7 +38,7 @@ export function RosterPage({ roster, canEdit, streaks }: Props) {
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Buscar jugador…"
         />
-        {canEdit && (
+        {isAdmin && (
           <Button variant="primary" className="shrink-0" onClick={() => setCreating(true)}>
             + Jugador
           </Button>
@@ -50,7 +53,7 @@ export function RosterPage({ roster, canEdit, streaks }: Props) {
           {players.length === 0 ? (
             <>
               <p className="text-lg">Todavía no hay jugadores.</p>
-              {canEdit && <p className="mt-1 text-sm">Agregá al primero con “+ Jugador”.</p>}
+              {isAdmin && <p className="mt-1 text-sm">Agregá al primero con “+ Jugador”.</p>}
             </>
           ) : (
             <p>Nadie coincide con “{query}”.</p>
@@ -59,31 +62,40 @@ export function RosterPage({ roster, canEdit, streaks }: Props) {
       )}
 
       <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-6">
-        {filtered.map((player) => (
-          <div key={player.id}>
-            <PlayerCard
-              player={player}
-              streak={streaks?.get(player.id)}
-              onClick={canEdit ? () => setEditing(player) : undefined}
-            />
-            <p className="mt-1 truncate text-center text-xs text-white/40">
-              {player.nickname ? player.name : displayName(player)}
-            </p>
-          </div>
-        ))}
+        {filtered.map((player) => {
+          const canEditThis = isAdmin || player.id === sessionPlayerId
+          return (
+            <div key={player.id}>
+              <PlayerCard
+                player={player}
+                streak={streaks?.get(player.id)}
+                onClick={canEditThis ? () => setEditing(player) : undefined}
+              />
+              <p className="mt-1 truncate text-center text-xs text-white/40">
+                {player.nickname ? player.name : displayName(player)}
+              </p>
+            </div>
+          )
+        })}
       </div>
 
-      <Modal open={creating} title="Nuevo jugador" onClose={() => setCreating(false)}>
-        <PlayerForm onSave={create} onDone={() => setCreating(false)} />
-      </Modal>
+      {isAdmin && (
+        <Modal open={creating} title="Nuevo jugador" onClose={() => setCreating(false)}>
+          <PlayerForm onSave={create} onDone={() => setCreating(false)} />
+        </Modal>
+      )}
 
-      <Modal open={editing !== null} title="Editar jugador" onClose={() => setEditing(null)}>
+      <Modal
+        open={editing !== null}
+        title={editing?.id === sessionPlayerId ? 'Tu carta' : 'Editar jugador'}
+        onClose={() => setEditing(null)}
+      >
         {editing && (
           <PlayerForm
             key={editing.id}
             player={editing}
             onSave={(draft) => update(editing.id, draft)}
-            onDelete={() => remove(editing.id)}
+            onDelete={isAdmin ? () => remove(editing.id) : undefined}
             onDone={() => setEditing(null)}
           />
         )}
