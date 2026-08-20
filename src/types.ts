@@ -5,6 +5,20 @@ export type Position = (typeof POSITIONS)[number]
 export const TIERS = ['gold', 'silver', 'bronze'] as const
 export type Tier = (typeof TIERS)[number]
 
+export const NACIONALIDADES = ['Argentina', 'España', 'Uruguay'] as const
+export type Nacionalidad = (typeof NACIONALIDADES)[number]
+
+export const CLUBES = [
+  'Barcelona',
+  'Boca Juniors',
+  'Independiente',
+  'Racing',
+  'Real Madrid',
+  'River Plate',
+  'San Lorenzo',
+] as const
+export type Club = (typeof CLUBES)[number]
+
 export type Player = {
   id: string
   name: string
@@ -18,6 +32,10 @@ export type Player = {
   photoUrl: string | null
   /** Storage key. Needed to delete the old file when a photo is replaced. */
   photoPath: string | null
+  /** Badge shown on the card. Null shows nothing — most players won't set this. */
+  nacionalidad: Nacionalidad | null
+  /** Badge shown on the card. Null shows nothing — most players won't set this. */
+  club: Club | null
   active: boolean
   createdAt: string
   /** The first player created in a group becomes its admin. Never settable through the

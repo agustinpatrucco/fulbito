@@ -1,4 +1,4 @@
-import type { Tier } from '../types'
+import type { Club, Nacionalidad, Tier } from '../types'
 
 /**
  * ─────────────────────────────────────────────────────────────────────────────
@@ -29,6 +29,10 @@ export type CardLayout = {
   name: Box
   /** Row of position badges (POR / DFC / …). */
   positions: Box
+  /** Club crest, top-left, drawn over the photo. Only shown when the player has one. */
+  club: Box
+  /** Flag, top-left below the club crest, drawn over the photo. */
+  nacionalidad: Box
   /** Colours for text drawn over the artwork. */
   ink: string
   inkMuted: string
@@ -46,10 +50,30 @@ export const CARD_BACKGROUNDS: Record<Tier, string> = {
   bronze: '/cards/bronze.png',
 }
 
+export const CLUB_BADGES: Record<Club, string> = {
+  Barcelona: '/clubs/barcelona.png',
+  'Boca Juniors': '/clubs/boca.png',
+  Independiente: '/clubs/independiente.png',
+  Racing: '/clubs/racing.png',
+  'Real Madrid': '/clubs/realmadrid.png',
+  'River Plate': '/clubs/riber.png',
+  'San Lorenzo': '/clubs/sanlorenzo.png',
+}
+
+export const NACIONALIDAD_FLAGS: Record<Nacionalidad, string> = {
+  Argentina: '/flags/Argentina.png',
+  España: '/flags/Espana.png',
+  Uruguay: '/flags/Uruguay.png',
+}
+
 const BASE: Omit<CardLayout, 'ink' | 'inkMuted' | 'accent'> = {
-  photo: { left: 18, top: 14, width: 64, height: 48 },
-  name: { left: 8, top: 66, width: 84, height: 10 },
-  positions: { left: 8, top: 78, width: 84, height: 9 },
+  // Shifted 10% right of the original `left: 18` to leave room for the club/
+  // nacionalidad badges at the left margin.
+  photo: { left: 26, top: 17.5, width: 64, height: 48 },
+  name: { left: 8, top: 68, width: 84, height: 10 },
+  positions: { left: 8, top: 80, width: 84, height: 9 },
+  club: { left: 13, top: 15, width: 18, height: 30 },
+  nacionalidad: { left: 14, top: 32, width: 16, height: 28 },
 }
 
 export const CARD_LAYOUTS: Record<Tier, CardLayout> = {
