@@ -84,6 +84,13 @@ create table if not exists public.players (
   tier           text not null check (tier in ('gold','silver','bronze')),
   photo_url      text,
   photo_path     text,
+  -- Optional badges drawn on the card, over the photo at the left margin. Null shows
+  -- nothing — most players won't set these.
+  nacionalidad   text check (nacionalidad is null or nacionalidad in ('Argentina', 'España', 'Uruguay')),
+  club           text check (club is null or club in (
+                   'Barcelona', 'Boca Juniors', 'Independiente', 'Racing', 'Real Madrid',
+                   'River Plate', 'San Lorenzo'
+                 )),
   active         boolean not null default true,
   created_at     timestamptz not null default now(),
   -- Null until the first time anyone picks this player, at which point the app asks

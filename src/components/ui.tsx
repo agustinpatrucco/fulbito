@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode } from 'react'
+import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes } from 'react'
 
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: 'primary' | 'ghost' | 'danger'
@@ -36,6 +36,16 @@ export function Input({ className = '', ...rest }: InputHTMLAttributes<HTMLInput
     <input
       className={`w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm
         outline-none placeholder:text-white/25 focus:border-emerald-400/60 ${className}`}
+      {...rest}
+    />
+  )
+}
+
+export function Select({ className = '', ...rest }: SelectHTMLAttributes<HTMLSelectElement>) {
+  return (
+    <select
+      className={`w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm
+        outline-none focus:border-emerald-400/60 ${className}`}
       {...rest}
     />
   )

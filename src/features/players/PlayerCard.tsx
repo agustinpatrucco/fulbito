@@ -3,6 +3,8 @@ import { displayName, isOutOfPosition } from '../../types'
 import {
   CARD_BACKGROUNDS,
   CARD_LAYOUTS,
+  CLUB_BADGES,
+  NACIONALIDAD_FLAGS,
   boxStyle,
 } from '../../config/cardLayout'
 
@@ -69,6 +71,22 @@ export function PlayerCard({
           </div>
         )}
       </div>
+
+      {/* Club crest and flag, drawn over the photo at the left margin — club on top. */}
+      {player.club && (
+        <div style={boxStyle(layout.club)}>
+          <img src={CLUB_BADGES[player.club]} alt="" className="h-full w-full object-contain" />
+        </div>
+      )}
+      {player.nacionalidad && (
+        <div style={boxStyle(layout.nacionalidad)}>
+          <img
+            src={NACIONALIDAD_FLAGS[player.nacionalidad]}
+            alt=""
+            className="h-full w-full object-contain"
+          />
+        </div>
+      )}
 
       {/* Name */}
       <div

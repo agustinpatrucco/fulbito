@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
-import { POSITIONS, TIERS, TIER_LABELS, POSITION_LABELS } from '../../types'
-import type { Player, PlayerDraft, Position, Tier } from '../../types'
-import { Button, ChipGroup, Field, Input } from '../../components/ui'
+import { POSITIONS, TIERS, TIER_LABELS, POSITION_LABELS, NACIONALIDADES, CLUBES } from '../../types'
+import type { Club, Nacionalidad, Player, PlayerDraft, Position, Tier } from '../../types'
+import { Button, ChipGroup, Field, Input, Select } from '../../components/ui'
 import { errorMessage } from '../../lib/errors'
 import { PlayerCard } from './PlayerCard'
 import { uploadPhoto, deletePhoto } from './photo'
@@ -25,6 +25,10 @@ export function PlayerForm({ player, initialName, onSave, onDelete, onDone }: Pr
   const [active, setActive] = useState(player?.active ?? true)
   const [photoUrl, setPhotoUrl] = useState(player?.photoUrl ?? null)
   const [photoPath, setPhotoPath] = useState(player?.photoPath ?? null)
+  const [nacionalidad, setNacionalidad] = useState<Nacionalidad | null>(
+    player?.nacionalidad ?? null,
+  )
+  const [club, setClub] = useState<Club | null>(player?.club ?? null)
 
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -45,6 +49,8 @@ export function PlayerForm({ player, initialName, onSave, onDelete, onDone }: Pr
     tier,
     photoUrl,
     photoPath,
+    nacionalidad,
+    club,
     active,
     createdAt: player?.createdAt ?? new Date().toISOString(),
     isAdmin: player?.isAdmin ?? false,
@@ -83,6 +89,8 @@ export function PlayerForm({ player, initialName, onSave, onDelete, onDone }: Pr
         tier,
         photoUrl,
         photoPath,
+        nacionalidad,
+        club,
         active,
       })
       onDone()
@@ -156,6 +164,41 @@ export function PlayerForm({ player, initialName, onSave, onDelete, onDone }: Pr
           renderLabel={(t) => TIER_LABELS[t]}
         />
       </Field>
+
+      <div className="flex gap-3">
+        <div className="flex-1">
+          <Field label="Nacionalidad">
+            <Select
+              value={nacionalidad ?? ''}
+              onChange={(e) =>
+                setNacionalidad((e.target.value || null) as Nacionalidad | null)
+              }
+            >
+              <option value="">— Ninguna —</option>
+              {NACIONALIDADES.map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
+            </Select>
+          </Field>
+        </div>
+        <div className="flex-1">
+          <Field label="Club">
+            <Select
+              value={club ?? ''}
+              onChange={(e) => setClub((e.target.value || null) as Club | null)}
+            >
+              <option value="">— Ninguno —</option>
+              {CLUBES.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </Select>
+          </Field>
+        </div>
+      </div>
 
       <Field label="Otros nombres para reconocerlo al pegar la lista (separados por coma)">
         <Input

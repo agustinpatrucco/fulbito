@@ -29,6 +29,8 @@ type PlayerRow = {
   tier: string
   photo_url: string | null
   photo_path: string | null
+  nacionalidad: string | null
+  club: string | null
   active: boolean
   created_at: string
   is_admin: boolean
@@ -46,6 +48,8 @@ function fromRow(row: PlayerRow): Player {
     tier: row.tier as Player['tier'],
     photoUrl: row.photo_url,
     photoPath: row.photo_path,
+    nacionalidad: row.nacionalidad as Player['nacionalidad'],
+    club: row.club as Player['club'],
     active: row.active,
     createdAt: row.created_at,
     isAdmin: row.is_admin,
@@ -63,6 +67,8 @@ function toRow(draft: Partial<PlayerDraft>): Partial<PlayerRow> {
   if (draft.tier !== undefined) row.tier = draft.tier
   if (draft.photoUrl !== undefined) row.photo_url = draft.photoUrl
   if (draft.photoPath !== undefined) row.photo_path = draft.photoPath
+  if (draft.nacionalidad !== undefined) row.nacionalidad = draft.nacionalidad
+  if (draft.club !== undefined) row.club = draft.club
   if (draft.active !== undefined) row.active = draft.active
   return row
 }
